@@ -10,16 +10,33 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  User,
-  Shield,
-  Sparkles,
   Check,
   LogOut,
-  KeyRound,
-  CheckCircle2
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { formatAuthError } from '../utils/authErrors';
+
+const GoogleIcon: React.FC = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+    <path
+      fill="#4285F4"
+      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.28 14.27a7.2 7.2 0 0 1 0-4.54V6.58H1.25a11.98 11.98 0 0 0 0 10.84l4.03-3.15z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+    />
+  </svg>
+);
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -29,7 +46,7 @@ export const LoginPage: React.FC = () => {
     profile, 
     role, 
     signIn, 
-    signInAsDemo, 
+    signInWithGoogle,
     signOut, 
     isAuthenticated, 
     isAdmin, 
@@ -41,10 +58,9 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDemoSubmitting, setIsDemoSubmitting] = useState<'citizen' | 'admin' | null>(null);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [fillFeedback, setFillFeedback] = useState<string | null>(null);
 
   const getDestinationPath = (userRole?: string | null) => {
     const from = (location.state as any)?.from?.pathname;
@@ -57,38 +73,25 @@ export const LoginPage: React.FC = () => {
     return '/complaints';
   };
 
-  const handleDemoSignIn = async (demoRole: 'citizen' | 'admin') => {
+  const handleGoogleSignIn = async () => {
     setErrorMessage(null);
-    setFillFeedback(null);
-    setIsDemoSubmitting(demoRole);
+    setIsGoogleSubmitting(true);
 
     try {
-      const { profile: signedInProfile, error } = await signInAsDemo(demoRole);
+      const { error } = await signInWithGoogle();
       if (error) {
         setErrorMessage(formatAuthError(error));
+        setIsGoogleSubmitting(false);
         return;
       }
 
-      const dest = getDestinationPath(signedInProfile?.role || demoRole);
-      navigate(dest, { replace: true });
+      if (isDemoMode) {
+        navigate('/complaints', { replace: true });
+      }
     } catch (err) {
       setErrorMessage(formatAuthError(err));
-    } finally {
-      setIsDemoSubmitting(null);
+      setIsGoogleSubmitting(false);
     }
-  };
-
-  const handleFillCredentials = (demoRole: 'citizen' | 'admin') => {
-    if (demoRole === 'citizen') {
-      setEmail('citizen@civicfix.org');
-      setPassword('citizen123');
-      setFillFeedback('Citizen credentials populated. Click "Sign In" to proceed.');
-    } else {
-      setEmail('admin@civicfix.org');
-      setPassword('admin123');
-      setFillFeedback('Admin credentials populated. Click "Sign In" to proceed.');
-    }
-    setErrorMessage(null);
   };
 
   const handleSignOutCurrent = async () => {
@@ -98,7 +101,6 @@ export const LoginPage: React.FC = () => {
       setEmail('');
       setPassword('');
       setErrorMessage(null);
-      setFillFeedback(null);
     } catch (err) {
       console.error('Failed to sign out:', err);
     } finally {
@@ -109,7 +111,6 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    setFillFeedback(null);
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
@@ -131,7 +132,7 @@ export const LoginPage: React.FC = () => {
         const friendlyError = formatAuthError(error);
         if (isConfigured && friendlyError.toLowerCase().includes('invalid')) {
           setErrorMessage(
-            'Invalid credentials. If you have not created an account in your Supabase database yet, click "Create Account" below or use the 1-Click Demo login.'
+            'Invalid credentials. If you have not created an account in your Supabase database yet, click "Create Account" below.'
           );
         } else {
           setErrorMessage(friendlyError);
@@ -168,7 +169,7 @@ export const LoginPage: React.FC = () => {
             {isDemoMode ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-400/20 border border-amber-400/30 text-amber-200">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                Instant Demo Mode Active
+                Demo Mode Active
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-400/20 border border-emerald-400/30 text-emerald-200">
@@ -229,89 +230,6 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Quick 1-Click Demo Access Bar */}
-          <div className="space-y-2.5">
-            <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                1-Click Demo Sign In
-              </span>
-              <span className="text-[11px] font-normal text-slate-400">Instant Access</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                id="btn-citizen-demo"
-                disabled={isSubmitting || isDemoSubmitting !== null}
-                onClick={() => handleDemoSignIn('citizen')}
-                className="py-2.5 px-3 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 text-blue-900 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.98]"
-              >
-                {isDemoSubmitting === 'citizen' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
-                ) : (
-                  <User className="w-3.5 h-3.5 text-blue-600" />
-                )}
-                <span>Citizen Demo</span>
-              </button>
-
-              <button
-                type="button"
-                id="btn-admin-demo"
-                disabled={isSubmitting || isDemoSubmitting !== null}
-                onClick={() => handleDemoSignIn('admin')}
-                className="py-2.5 px-3 bg-purple-50 hover:bg-purple-100/80 border border-purple-200 text-purple-900 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.98]"
-              >
-                {isDemoSubmitting === 'admin' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
-                ) : (
-                  <Shield className="w-3.5 h-3.5 text-purple-600" />
-                )}
-                <span>Admin Demo</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-slate-400 font-medium">Or Sign In with Email</span>
-            </div>
-          </div>
-
-          {/* Quick Credential Population Chips */}
-          <div className="flex items-center justify-between text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-            <span className="text-slate-500 font-medium flex items-center gap-1">
-              <KeyRound className="w-3.5 h-3.5 text-slate-400" />
-              Quick Fill:
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => handleFillCredentials('citizen')}
-                className="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-blue-100/60 text-blue-800 hover:bg-blue-200 transition"
-              >
-                Citizen
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFillCredentials('admin')}
-                className="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-purple-100/60 text-purple-800 hover:bg-purple-200 transition"
-              >
-                Admin
-              </button>
-            </div>
-          </div>
-
-          {/* Feedback Info Box */}
-          {fillFeedback && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2 animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{fillFeedback}</span>
-            </div>
-          )}
-
           {/* Error Message Box */}
           {errorMessage && (
             <div 
@@ -322,6 +240,36 @@ export const LoginPage: React.FC = () => {
               <div className="flex-1 font-medium">{errorMessage}</div>
             </div>
           )}
+
+          {/* Sign In with Google Button */}
+          <div>
+            <button
+              type="button"
+              id="btn-google-signin"
+              onClick={handleGoogleSignIn}
+              disabled={isGoogleSubmitting || isSubmitting}
+              className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl shadow-xs transition flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 active:scale-[0.99]"
+            >
+              {isGoogleSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+              ) : (
+                <GoogleIcon />
+              )}
+              <span>Sign in with Google</span>
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2.5 text-slate-400 font-medium tracking-wider">
+                Or sign in with email
+              </span>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             {/* Email Field */}
@@ -343,7 +291,6 @@ export const LoginPage: React.FC = () => {
                   onChange={(e) => {
                     setEmail(e.target.value);
                     if (errorMessage) setErrorMessage(null);
-                    if (fillFeedback) setFillFeedback(null);
                   }}
                   placeholder="name@example.com"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white focus:border-transparent transition"
@@ -372,7 +319,6 @@ export const LoginPage: React.FC = () => {
                   onChange={(e) => {
                     setPassword(e.target.value);
                     if (errorMessage) setErrorMessage(null);
-                    if (fillFeedback) setFillFeedback(null);
                   }}
                   placeholder="••••••••"
                   className="w-full pl-10 pr-11 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white focus:border-transparent transition"
@@ -392,7 +338,7 @@ export const LoginPage: React.FC = () => {
             <button
               type="submit"
               id="btn-login-submit"
-              disabled={isSubmitting || isDemoSubmitting !== null}
+              disabled={isSubmitting}
               className="w-full mt-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               {isSubmitting ? (

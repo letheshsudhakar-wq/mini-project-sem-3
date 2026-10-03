@@ -23,6 +23,7 @@ interface AuthContextType {
   isConfigured: boolean;
   isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<{ user: User | null; profile: Profile | null; error: Error | null }>;
+  signInWithGoogle: () => Promise<{ error: Error | null }>;
   signInAsDemo: (role: 'citizen' | 'admin') => Promise<{ user: User | null; profile: Profile | null; error: Error | null }>;
   signUp: (params: SignUpParams) => Promise<{ user: User | null; emailConfirmationRequired: boolean; error: Error | null }>;
   signOut: () => Promise<{ error: Error | null }>;
@@ -251,6 +252,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { user: authUser, profile: userProfile, error: null };
   };
 
+  // Google OAuth sign in action
+  const signInWithGoogle = async () => {
+    setLoading(true);
+    try {
+      if (!isSupabaseConfigured) {
+        // Fallback for offline demo mode
+        const googleProfile: Profile = {
+          id: `google-user-${Date.now()}`,
+          name: 'Google Citizen',
+          email: 'citizen.google@civicfix.org',
+          phone: '',
+          role: 'citizen',
+          created_at: new Date().toISOString(),
+        };
+        MockCivicStore.saveProfile(googleProfile);
+        localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(googleProfile));
+
+        const mockUser = createMockSupabaseUser(googleProfile);
+        setUser(mockUser);
+        setProfile(googleProfile);
+        setLoading(false);
+        return { error: null };
+      }
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/complaints`,
+        },
+      });
+
+      if (error) {
+        setLoading(false);
+        return { error };
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      setLoading(false);
+      return { error: err };
+    }
+  };
+
   // Sign up action (Guarantees default citizen role)
   const signUp = async ({ name, email, phone, password }: SignUpParams) => {
     const trimmedEmail = email.trim().toLowerCase();
@@ -351,6 +395,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isConfigured: isSupabaseConfigured,
         isDemoMode: !isSupabaseConfigured,
         signIn,
+        signInWithGoogle,
         signInAsDemo,
         signUp,
         signOut,

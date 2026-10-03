@@ -17,9 +17,30 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { formatAuthError } from '../utils/authErrors';
 
+const GoogleIcon: React.FC = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+    <path
+      fill="#4285F4"
+      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.28 14.27a7.2 7.2 0 0 1 0-4.54V6.58H1.25a11.98 11.98 0 0 0 0 10.84l4.03-3.15z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+    />
+  </svg>
+);
+
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signUp, signInWithGoogle, isDemoMode } = useAuth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,8 +49,28 @@ export const SignupPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState<{ emailVerificationNeeded: boolean; email: string } | null>(null);
+
+  const handleGoogleSignUp = async () => {
+    setErrorMessage(null);
+    setIsGoogleSubmitting(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        setErrorMessage(formatAuthError(error));
+        setIsGoogleSubmitting(false);
+        return;
+      }
+      if (isDemoMode) {
+        navigate('/complaints', { replace: true });
+      }
+    } catch (err) {
+      setErrorMessage(formatAuthError(err));
+      setIsGoogleSubmitting(false);
+    }
+  };
 
   const validateForm = (): string | null => {
     if (!name.trim()) {
@@ -164,6 +205,36 @@ export const SignupPage: React.FC = () => {
                   <div className="flex-1 font-medium">{errorMessage}</div>
                 </div>
               )}
+
+              {/* Sign Up with Google Button */}
+              <div>
+                <button
+                  type="button"
+                  id="btn-google-signup"
+                  onClick={handleGoogleSignUp}
+                  disabled={isGoogleSubmitting || isSubmitting}
+                  className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl shadow-xs transition flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 active:scale-[0.99]"
+                >
+                  {isGoogleSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+                  ) : (
+                    <GoogleIcon />
+                  )}
+                  <span>Sign up with Google</span>
+                </button>
+              </div>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2.5 text-slate-400 font-medium tracking-wider">
+                    Or register with email
+                  </span>
+                </div>
+              </div>
 
               <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                 {/* Full Name */}
