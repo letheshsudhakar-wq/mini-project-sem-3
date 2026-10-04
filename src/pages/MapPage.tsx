@@ -6,18 +6,22 @@ import {
   Navigation, 
   RefreshCw, 
   Loader2, 
-  Info 
+  Info
 } from 'lucide-react';
 import { complaintsService } from '../services/complaints';
 import { PublicCivicMap } from '../components/PublicCivicMap';
 import { CategoryLegend } from '../components/CategoryLegend';
 import { MapComplaintDrawer } from '../components/MapComplaintDrawer';
 import { COMPLAINT_CATEGORIES } from '../utils/constants';
+import { nativeService } from '../services/nativeService';
+import { useToast } from '../contexts/ToastContext';
 import type { Complaint, ComplaintCategory } from '../types';
 
 type StatusFilterType = 'all' | 'reported' | 'in_progress';
 
 export const MapPage: React.FC = () => {
+  const { info, warning } = useToast();
+
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -33,7 +37,7 @@ export const MapPage: React.FC = () => {
   const [locationAlert, setLocationAlert] = useState<string | null>(null);
 
   // Fetch Open Complaints for Public Map
-  const fetchOpenComplaints = useCallback(async () => {
+  const fetchOpenComplaints = useCallback(async (isManualRefresh = false) => {
     setIsLoading(true);
     setErrorMsg(null);
 
@@ -42,7 +46,6 @@ export const MapPage: React.FC = () => {
       if (error) {
         setErrorMsg('Unable to load civic complaints. Please check your connection.');
       } else {
-        // Filter out any entries with corrupted coordinates to prevent map errors
         const validList = (data || []).filter(
           (c) =>
             isFinite(c.latitude) &&
@@ -53,59 +56,58 @@ export const MapPage: React.FC = () => {
             c.longitude <= 180
         );
         setComplaints(validList);
+        if (isManualRefresh) {
+          nativeService.triggerHaptic('success');
+          info('Map complaints updated');
+        }
       }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Error fetching open map complaints.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [info]);
 
   useEffect(() => {
     fetchOpenComplaints();
   }, [fetchOpenComplaints]);
 
-  // Handle Find Issues Near Me (500m radius)
-  const handleFindNearbyIssues = () => {
-    if (!navigator.geolocation) {
-      setLocationAlert('Geolocation is not supported by your browser.');
-      return;
-    }
-
+  // Handle Find Issues Near Me (500m radius) with native GPS
+  const handleFindNearbyIssues = async () => {
     setIsLocating(true);
     setLocationAlert(null);
+    nativeService.triggerHaptic('light');
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setUserLocation(coords);
-        setIsLocating(false);
+    try {
+      const pos = await nativeService.getCurrentLocation();
+      const coords = { lat: pos.latitude, lng: pos.longitude };
+      setUserLocation(coords);
+      setIsLocating(false);
 
-        // Fetch nearby open complaints within 500m radius
-        const { data: nearby } = await complaintsService.getNearbyOpenComplaints(
-          coords.lat,
-          coords.lng,
-          500 // 500 meters
-        );
+      const { data: nearby } = await complaintsService.getNearbyOpenComplaints(
+        coords.lat,
+        coords.lng,
+        500 // 500 meters
+      );
 
-        const count = nearby?.length ?? 0;
+      const count = nearby?.length ?? 0;
+      nativeService.triggerHaptic(count > 0 ? 'success' : 'light');
 
-        if (count > 0) {
-          setLocationAlert(`Found ${count} open civic issue(s) within 500m of your location.`);
-        } else {
-          setLocationAlert('No open civic issues found within 500m of your location.');
-        }
-      },
-      (err) => {
-        setIsLocating(false);
-        if (err.code === err.PERMISSION_DENIED) {
-          setLocationAlert('Location permission was denied. You can still explore the map manually.');
-        } else {
-          setLocationAlert('Unable to acquire GPS location. Please browse the map manually.');
-        }
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+      if (count > 0) {
+        const alertText = `Found ${count} open civic issue(s) within 500m of your location.`;
+        setLocationAlert(alertText);
+        info(alertText);
+      } else {
+        const alertText = 'No open civic issues found within 500m of your location.';
+        setLocationAlert(alertText);
+        info(alertText);
+      }
+    } catch (err: any) {
+      setIsLocating(false);
+      const msg = err?.message || 'Unable to acquire GPS location.';
+      setLocationAlert(msg);
+      warning(msg);
+    }
   };
 
   // Compute category counts for active complaints
@@ -144,15 +146,15 @@ export const MapPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+    <div className="space-y-4 sm:space-y-6 max-w-6xl mx-auto pb-8 animate-in fade-in duration-200">
       {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
             <MapPin className="w-3.5 h-3.5" />
             Civic Geographic Visualization
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
             Public Civic Issue Map
           </h1>
           <p className="text-xs sm:text-sm text-slate-500">
@@ -161,24 +163,25 @@ export const MapPage: React.FC = () => {
         </div>
 
         {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleFindNearbyIssues}
             disabled={isLocating}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold shadow-2xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             {isLocating ? (
               <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
             ) : (
               <Navigation className="w-4 h-4 text-blue-600" />
             )}
-            <span>{isLocating ? 'Locating...' : 'Find Issues Near Me'}</span>
+            <span>{isLocating ? 'Scanning Area...' : 'Find Near Me'}</span>
           </button>
 
           <Link
             to="/report"
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-500/20 transition active:scale-95"
+            onClick={() => nativeService.triggerHaptic('light')}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-md shadow-blue-500/20 transition active:scale-95"
           >
             <PlusCircle className="w-4 h-4" />
             Report Issue
@@ -188,46 +191,54 @@ export const MapPage: React.FC = () => {
 
       {/* Geolocation Notice / Alert banner */}
       {locationAlert && (
-        <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl text-xs sm:text-sm text-blue-900 flex items-center justify-between gap-3 animate-in fade-in">
-          <div className="flex items-center gap-2">
+        <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl text-xs sm:text-sm text-blue-900 flex items-center justify-between gap-3 animate-in fade-in shadow-2xs">
+          <div className="flex items-center gap-2 min-w-0">
             <Info className="w-4 h-4 text-blue-600 shrink-0" />
-            <span>{locationAlert}</span>
+            <span className="truncate">{locationAlert}</span>
           </div>
           <button
             onClick={() => setLocationAlert(null)}
-            className="text-xs font-semibold text-blue-700 hover:underline cursor-pointer shrink-0"
+            className="text-xs font-bold text-blue-700 hover:underline cursor-pointer shrink-0"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        {/* Category Pills / Dropdown */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none text-xs font-semibold">
+      {/* Filter Bar with Horizontal Carousel on Mobile */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+        {/* Category Pills with no-scrollbar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 no-scrollbar text-xs font-semibold -mx-1 px-1">
           <button
-            onClick={() => setCategoryFilter('all')}
-            className={`px-3.5 py-2 rounded-xl transition shrink-0 cursor-pointer ${
+            type="button"
+            onClick={() => {
+              nativeService.triggerHaptic('light');
+              setCategoryFilter('all');
+            }}
+            className={`px-3 py-2 rounded-2xl transition shrink-0 cursor-pointer active:scale-95 ${
               categoryFilter === 'all'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
             }`}
           >
-            All Categories ({complaints.length})
+            All ({complaints.length})
           </button>
           {COMPLAINT_CATEGORIES.map((cat) => (
             <button
               key={cat.value}
-              onClick={() => setCategoryFilter(cat.value)}
-              className={`px-3 py-2 rounded-xl transition shrink-0 flex items-center gap-1.5 cursor-pointer ${
+              type="button"
+              onClick={() => {
+                nativeService.triggerHaptic('light');
+                setCategoryFilter(cat.value);
+              }}
+              className={`px-3 py-2 rounded-2xl transition shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
                 categoryFilter === cat.value
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
               }`}
             >
               <span>{cat.label.split(' ')[0]}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
                 categoryFilter === cat.value ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
               }`}>
                 {categoryCounts[cat.value] || 0}
@@ -237,29 +248,41 @@ export const MapPage: React.FC = () => {
         </div>
 
         {/* Status Filter */}
-        <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 shrink-0">
-          <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
+        <div className="flex items-center justify-between md:justify-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 shrink-0">
+          <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-200 text-xs font-semibold">
             <button
-              onClick={() => setStatusFilter('all')}
-              className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                statusFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              type="button"
+              onClick={() => {
+                nativeService.triggerHaptic('light');
+                setStatusFilter('all');
+              }}
+              className={`px-2.5 py-1 rounded-xl transition cursor-pointer ${
+                statusFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               All Open
             </button>
             <button
-              onClick={() => setStatusFilter('reported')}
-              className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer ${
-                statusFilter === 'reported' ? 'bg-white text-amber-800 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              type="button"
+              onClick={() => {
+                nativeService.triggerHaptic('light');
+                setStatusFilter('reported');
+              }}
+              className={`px-2.5 py-1 rounded-xl transition flex items-center gap-1 cursor-pointer ${
+                statusFilter === 'reported' ? 'bg-white text-amber-800 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               Reported
             </button>
             <button
-              onClick={() => setStatusFilter('in_progress')}
-              className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer ${
-                statusFilter === 'in_progress' ? 'bg-white text-blue-800 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              type="button"
+              onClick={() => {
+                nativeService.triggerHaptic('light');
+                setStatusFilter('in_progress');
+              }}
+              className={`px-2.5 py-1 rounded-xl transition flex items-center gap-1 cursor-pointer ${
+                statusFilter === 'in_progress' ? 'bg-white text-blue-800 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
@@ -268,11 +291,12 @@ export const MapPage: React.FC = () => {
           </div>
 
           <button
-            onClick={fetchOpenComplaints}
+            type="button"
+            onClick={() => fetchOpenComplaints(true)}
             title="Refresh map complaints"
-            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl border border-slate-200 transition shrink-0"
+            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-2xl border border-slate-200 transition shrink-0 active:scale-95 cursor-pointer"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
           </button>
         </div>
       </div>
@@ -281,10 +305,10 @@ export const MapPage: React.FC = () => {
       <div className="space-y-4">
         {/* Error banner if fetch failed */}
         {errorMsg && (
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-center justify-between">
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-3xl text-xs text-rose-800 flex items-center justify-between">
             <span>{errorMsg}</span>
             <button
-              onClick={fetchOpenComplaints}
+              onClick={() => fetchOpenComplaints(true)}
               className="text-xs font-bold text-rose-700 hover:underline"
             >
               Retry
@@ -298,8 +322,11 @@ export const MapPage: React.FC = () => {
             complaints={filteredComplaints}
             userLocation={userLocation}
             selectedComplaintId={selectedComplaint?.id}
-            onSelectComplaint={(c) => setSelectedComplaint(c)}
-            className="h-[460px] sm:h-[580px]"
+            onSelectComplaint={(c) => {
+              nativeService.triggerHaptic('light');
+              setSelectedComplaint(c);
+            }}
+            className="h-[440px] sm:h-[580px]"
           />
 
           {/* Loading Overlay */}
@@ -317,12 +344,15 @@ export const MapPage: React.FC = () => {
         <CategoryLegend
           counts={categoryCounts}
           selectedCategory={categoryFilter}
-          onSelectCategory={(cat) => setCategoryFilter(cat)}
+          onSelectCategory={(cat) => {
+            nativeService.triggerHaptic('light');
+            setCategoryFilter(cat);
+          }}
         />
 
         {/* Selected Complaint Detail Drawer / Card */}
         {selectedComplaint && (
-          <div className="pt-2">
+          <div className="pt-2 animate-in slide-in-from-bottom-3 duration-200">
             <MapComplaintDrawer
               complaint={selectedComplaint}
               onClose={() => setSelectedComplaint(null)}
@@ -333,11 +363,11 @@ export const MapPage: React.FC = () => {
 
         {/* Empty State when no open complaints match */}
         {!isLoading && filteredComplaints.length === 0 && (
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-3 shadow-xs">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 text-center space-y-3 shadow-2xs">
             <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto">
               <MapPin className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-slate-800">
+            <h3 className="text-sm sm:text-base font-bold text-slate-800">
               {complaints.length === 0
                 ? 'No open civic issues have been reported yet.'
                 : 'No open complaints match your current filter selection.'}
@@ -351,7 +381,8 @@ export const MapPage: React.FC = () => {
               <div className="pt-1">
                 <Link
                   to="/report"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition"
+                  onClick={() => nativeService.triggerHaptic('light')}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-bold shadow-sm transition active:scale-95"
                 >
                   <PlusCircle className="w-4 h-4" />
                   Report an Issue
@@ -359,11 +390,13 @@ export const MapPage: React.FC = () => {
               </div>
             ) : (
               <button
+                type="button"
                 onClick={() => {
+                  nativeService.triggerHaptic('light');
                   setCategoryFilter('all');
                   setStatusFilter('all');
                 }}
-                className="text-xs font-semibold text-blue-600 hover:underline"
+                className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
               >
                 Clear all filters
               </button>

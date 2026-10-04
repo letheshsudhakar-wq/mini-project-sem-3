@@ -10,19 +10,22 @@ import {
   UserPlus, 
   LogOut, 
   Database,
-  Menu,
-  X,
   User as UserIcon,
   Layers,
-  Loader2
+  Loader2,
+  Sparkles,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { MobileBottomNav } from '../components/MobileBottomNav';
+import { MobileDrawer } from '../components/MobileDrawer';
+import { MobileHeader } from '../components/MobileHeader';
 
 export const RootLayout: React.FC = () => {
-  const { user, profile, role, isAdmin, isConfigured, signOut } = useAuth();
+  const { user, profile, role, isAdmin, isConfigured, isDemoMode, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const isActive = (path: string) => {
@@ -38,7 +41,6 @@ export const RootLayout: React.FC = () => {
       if (error) {
         console.error('Logout error:', error);
       }
-      setMobileMenuOpen(false);
       navigate('/login', { replace: true });
     } catch (err) {
       console.error('Logout failed:', err);
@@ -48,28 +50,28 @@ export const RootLayout: React.FC = () => {
     }
   };
 
-  const closeMobileMenu = () => setMobileMenuOpen(false);
-
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased selection:bg-blue-600 selection:text-white">
+      {/* Mobile Top Header */}
+      <MobileHeader onOpenDrawer={() => setDrawerOpen(true)} />
+
       {/* Configuration notice banner if Supabase env is not set */}
       {!isConfigured && (
-        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2.5 text-xs sm:text-sm text-amber-900 text-center flex items-center justify-center gap-2">
-          <Database className="w-4 h-4 text-amber-700 shrink-0" />
+        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-xs sm:text-sm text-amber-900 text-center flex items-center justify-center gap-2">
+          <Database className="w-3.5 h-3.5 text-amber-700 shrink-0" />
           <span>
-            <strong>Setup Notice:</strong> Supabase environment variables are missing. Configure <code className="bg-amber-100 font-mono text-xs px-1.5 py-0.5 rounded border border-amber-300">.env</code> with your project URL & Anon Key to authenticate.
+            <strong>Offline / Demo Mode:</strong> Using local mock database. Add Supabase keys to <code className="bg-amber-100 font-mono text-[11px] px-1 py-0.5 rounded border border-amber-300">.env</code> for live cloud sync.
           </span>
         </div>
       )}
 
-      {/* Main Header / Navigation */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+      {/* Desktop Main Header / Navigation */}
+      <header className="hidden md:block sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo Branding */}
           <div className="flex items-center gap-8">
             <Link 
               to="/" 
-              onClick={closeMobileMenu}
               className="flex items-center gap-2.5 font-bold text-xl text-slate-900 tracking-tight group"
             >
               <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/20 group-hover:bg-blue-700 transition">
@@ -81,9 +83,9 @@ export const RootLayout: React.FC = () => {
               </div>
             </Link>
 
-            {/* Desktop Navigation Links (Visible only after logging into dashboard) */}
+            {/* Desktop Navigation Links */}
             {user && (
-              <nav className="hidden md:flex items-center gap-1.5 text-sm font-medium">
+              <nav className="flex items-center gap-1.5 text-sm font-medium">
                 {role === 'citizen' && (
                   <>
                     <Link
@@ -144,7 +146,20 @@ export const RootLayout: React.FC = () => {
           </div>
 
           {/* Desktop Right User Controls */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="flex items-center gap-3">
+            {/* Live vs Demo Pill */}
+            {isDemoMode ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                <Sparkles className="w-3 h-3 text-amber-600" />
+                Demo Store
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                <Check className="w-3 h-3 text-emerald-600" />
+                Supabase Connected
+              </span>
+            )}
+
             {user ? (
               <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
                 <div className="flex items-center gap-2.5">
@@ -194,128 +209,22 @@ export const RootLayout: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* Mobile Menu Button */}
-          <div className="flex items-center md:hidden gap-2">
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 focus:outline-none transition"
-              aria-label="Toggle navigation menu"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
         </div>
-
-        {/* Mobile Dropdown Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-6 space-y-3 shadow-lg">
-            {user && (
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                    {(profile?.name || user.email || 'U').charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-slate-800">{profile?.name || user.email}</span>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">{role || 'Citizen'}</span>
-                  </div>
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  disabled={isLoggingOut}
-                  className="text-xs font-medium text-rose-600 hover:text-rose-700 flex items-center gap-1 p-1.5"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  Sign Out
-                </button>
-              </div>
-            )}
-
-            <nav className="flex flex-col gap-1 text-sm font-medium">
-              {user && (
-                <>
-                  {role === 'citizen' && (
-                    <>
-                      <Link
-                        to="/complaints"
-                        onClick={closeMobileMenu}
-                        className={`px-3 py-2.5 rounded-xl transition flex items-center gap-2 ${
-                          isActive('/complaints') ? 'text-blue-600 bg-blue-50 font-semibold' : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        <ListFilter className="w-4 h-4" />
-                        My Complaints
-                      </Link>
-                      <Link
-                        to="/report"
-                        onClick={closeMobileMenu}
-                        className={`px-3 py-2.5 rounded-xl transition flex items-center gap-2 ${
-                          isActive('/report') ? 'text-blue-600 bg-blue-50 font-semibold' : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        <PlusCircle className="w-4 h-4" />
-                        Report Issue
-                      </Link>
-                    </>
-                  )}
-
-                  {isAdmin && (
-                    <Link
-                      to="/admin"
-                      onClick={closeMobileMenu}
-                      className={`px-3 py-2.5 rounded-xl transition flex items-center gap-2 ${
-                        isActive('/admin') ? 'text-indigo-700 bg-indigo-50 font-bold' : 'text-indigo-600 hover:bg-indigo-50'
-                      }`}
-                    >
-                      <ShieldCheck className="w-4 h-4" />
-                      Admin Dashboard
-                    </Link>
-                  )}
-
-                  <Link
-                    to="/map"
-                    onClick={closeMobileMenu}
-                    className={`px-3 py-2.5 rounded-xl transition flex items-center gap-2 ${
-                      isActive('/map') ? 'text-blue-600 bg-blue-50 font-semibold' : 'text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <MapPin className="w-4 h-4" />
-                    Map
-                  </Link>
-                </>
-              )}
-
-              {!user && (
-                <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
-                  <Link
-                    to="/login"
-                    onClick={closeMobileMenu}
-                    className="w-full py-2.5 text-center text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    to="/signup"
-                    onClick={closeMobileMenu}
-                    className="w-full py-2.5 text-center text-sm font-semibold text-white bg-blue-600 rounded-xl"
-                  >
-                    Sign Up
-                  </Link>
-                </div>
-              )}
-            </nav>
-          </div>
-        )}
       </header>
 
-      {/* Main Page Outlet */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Main Page Outlet with Mobile Safe Area Padding */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 pb-safe-nav md:pb-8">
         <Outlet />
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 mt-auto py-6">
+      {/* Mobile Drawer */}
+      <MobileDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      {/* Mobile Bottom Navigation Bar */}
+      <MobileBottomNav onOpenDrawer={() => setDrawerOpen(true)} />
+
+      {/* Desktop Footer */}
+      <footer className="hidden md:block bg-white border-t border-slate-200 mt-auto py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
@@ -324,7 +233,7 @@ export const RootLayout: React.FC = () => {
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
               <Layers className="w-3.5 h-3.5 text-slate-400" />
-              Supabase Auth + Row Level Security
+              Supabase Auth + Row Level Security + Mobile Capacitor Ready
             </span>
           </div>
         </div>

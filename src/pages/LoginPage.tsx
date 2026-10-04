@@ -12,10 +12,13 @@ import {
   EyeOff,
   Check,
   LogOut,
-  Sparkles
+  Sparkles,
+  User
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { formatAuthError } from '../utils/authErrors';
+import { nativeService } from '../services/nativeService';
+import { useToast } from '../contexts/ToastContext';
 
 const GoogleIcon: React.FC = () => (
   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -41,12 +44,14 @@ const GoogleIcon: React.FC = () => (
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { success, error: toastError } = useToast();
   const { 
     user, 
     profile, 
     role, 
     signIn, 
     signInWithGoogle,
+    signInAsDemo,
     signOut, 
     isAuthenticated, 
     isAdmin, 
@@ -74,6 +79,7 @@ export const LoginPage: React.FC = () => {
   };
 
   const handleGoogleSignIn = async () => {
+    nativeService.triggerHaptic('light');
     setErrorMessage(null);
     setIsGoogleSubmitting(true);
 
@@ -81,11 +87,13 @@ export const LoginPage: React.FC = () => {
       const { error } = await signInWithGoogle();
       if (error) {
         setErrorMessage(formatAuthError(error));
+        toastError('Google sign in failed');
         setIsGoogleSubmitting(false);
         return;
       }
 
       if (isDemoMode) {
+        success('Signed in successfully');
         navigate('/complaints', { replace: true });
       }
     } catch (err) {
@@ -94,13 +102,31 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  const handleQuickDemoLogin = async (targetRole: 'citizen' | 'admin') => {
+    nativeService.triggerHaptic('medium');
+    setIsSubmitting(true);
+    try {
+      const { error } = await signInAsDemo(targetRole);
+      if (error) {
+        setErrorMessage(error.message);
+      } else {
+        success(`Signed in as Demo ${targetRole === 'admin' ? 'Admin' : 'Citizen'}`);
+        navigate(targetRole === 'admin' ? '/admin' : '/complaints', { replace: true });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSignOutCurrent = async () => {
     setIsSigningOut(true);
+    nativeService.triggerHaptic('medium');
     try {
       await signOut();
       setEmail('');
       setPassword('');
       setErrorMessage(null);
+      success('Signed out');
     } catch (err) {
       console.error('Failed to sign out:', err);
     } finally {
@@ -124,6 +150,7 @@ export const LoginPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
+    nativeService.triggerHaptic('light');
 
     try {
       const { profile: userProfile, error } = await signIn(trimmedEmail, password);
@@ -137,10 +164,13 @@ export const LoginPage: React.FC = () => {
         } else {
           setErrorMessage(friendlyError);
         }
+        toastError('Authentication failed');
         setIsSubmitting(false);
         return;
       }
 
+      nativeService.triggerHaptic('success');
+      success('Signed in successfully!');
       const assignedRole = userProfile?.role || (trimmedEmail.includes('admin') ? 'admin' : 'citizen');
       const dest = getDestinationPath(assignedRole);
       navigate(dest, { replace: true });
@@ -152,14 +182,14 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto py-8 px-4 sm:px-0">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="w-full max-w-md mx-auto py-4 sm:py-8 px-2 sm:px-0 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Header Banner */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-blue-950 p-6 sm:p-8 text-white text-center space-y-2">
           <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-400/30 text-blue-400 mx-auto flex items-center justify-center shadow-inner">
             <LogIn className="w-6 h-6 text-blue-300" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Sign In to CivicFix</h1>
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">Sign In to CivicFix</h1>
           <p className="text-xs sm:text-sm text-slate-300">
             Access your civic grievance reports, upvotes, and status updates
           </p>
@@ -167,12 +197,12 @@ export const LoginPage: React.FC = () => {
           {/* Mode Pill */}
           <div className="pt-2 flex justify-center">
             {isDemoMode ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-400/20 border border-amber-400/30 text-amber-200">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-400/20 border border-amber-400/30 text-amber-200">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                 Demo Mode Active
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-400/20 border border-emerald-400/30 text-emerald-200">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-400/20 border border-emerald-400/30 text-emerald-200">
                 <Check className="w-3.5 h-3.5 text-emerald-300" />
                 Supabase Live Connected
               </span>
@@ -181,8 +211,40 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Form Body */}
-        <div className="p-6 sm:p-8 space-y-6">
-          {/* Active Session Card (if user is currently signed in) */}
+        <div className="p-5 sm:p-8 space-y-5">
+          {/* 1-Tap Quick Demo Switcher */}
+          <div className="space-y-1.5 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+            <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                Instant Demo Access
+              </span>
+              <span className="text-[10px] text-slate-400 lowercase">1-tap sign in</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => handleQuickDemoLogin('citizen')}
+                disabled={isSubmitting}
+                className="py-2 px-3 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-xs font-bold text-slate-700 transition flex items-center justify-center gap-1.5 active:scale-95 shadow-2xs cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5 text-blue-600" />
+                <span>Demo Citizen</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickDemoLogin('admin')}
+                disabled={isSubmitting}
+                className="py-2 px-3 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs font-bold text-slate-700 transition flex items-center justify-center gap-1.5 active:scale-95 shadow-2xs cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Demo Admin</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Active Session Card */}
           {isAuthenticated && user && (
             <div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
@@ -195,7 +257,7 @@ export const LoginPage: React.FC = () => {
                       {profile?.name || user.email}
                     </p>
                     <p className="text-[10px] uppercase font-bold text-blue-700 tracking-wider">
-                      Currently Signed In ({role || (isAdmin ? 'Admin' : 'Citizen')})
+                      Signed In ({role || (isAdmin ? 'Admin' : 'Citizen')})
                     </p>
                   </div>
                 </div>
@@ -204,7 +266,7 @@ export const LoginPage: React.FC = () => {
                   type="button"
                   onClick={handleSignOutCurrent}
                   disabled={isSigningOut}
-                  className="px-2.5 py-1 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  className="px-2.5 py-1 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
                   title="Sign out of current account"
                 >
                   {isSigningOut ? (
@@ -217,7 +279,7 @@ export const LoginPage: React.FC = () => {
               </div>
 
               <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between gap-2">
-                <span className="text-[11px] text-slate-600">Already signed in to this account.</span>
+                <span className="text-[11px] text-slate-600">Already signed in.</span>
                 <button
                   type="button"
                   onClick={() => navigate(getDestinationPath(role), { replace: true })}
@@ -234,28 +296,28 @@ export const LoginPage: React.FC = () => {
           {errorMessage && (
             <div 
               role="alert" 
-              className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs sm:text-sm text-rose-800 flex items-start gap-3 animate-in fade-in"
+              className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs sm:text-sm text-rose-800 flex items-start gap-2.5 animate-in fade-in"
             >
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div className="flex-1 font-medium">{errorMessage}</div>
             </div>
           )}
 
-          {/* Sign In with Google Button */}
+          {/* Google Sign In */}
           <div>
             <button
               type="button"
               id="btn-google-signin"
               onClick={handleGoogleSignIn}
               disabled={isGoogleSubmitting || isSubmitting}
-              className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl shadow-xs transition flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 active:scale-[0.99]"
+              className="w-full py-3 px-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs sm:text-sm font-bold rounded-2xl shadow-2xs transition flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 active:scale-[0.99]"
             >
               {isGoogleSubmitting ? (
                 <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
               ) : (
                 <GoogleIcon />
               )}
-              <span>Sign in with Google</span>
+              <span>Continue with Google</span>
             </button>
           </div>
 
@@ -265,18 +327,18 @@ export const LoginPage: React.FC = () => {
               <div className="w-full border-t border-slate-200" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2.5 text-slate-400 font-medium tracking-wider">
-                Or sign in with email
+              <span className="bg-white px-2.5 text-slate-400 font-bold tracking-wider text-[10px]">
+                Or email & password
               </span>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
             {/* Email Field */}
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <label 
                 htmlFor="login-email" 
-                className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
               >
                 Email Address <span className="text-rose-500">*</span>
               </label>
@@ -293,17 +355,17 @@ export const LoginPage: React.FC = () => {
                     if (errorMessage) setErrorMessage(null);
                   }}
                   placeholder="name@example.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white focus:border-transparent transition"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
                 />
               </div>
             </div>
 
             {/* Password Field */}
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <label 
                   htmlFor="login-password" 
-                  className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                  className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
                 >
                   Password <span className="text-rose-500">*</span>
                 </label>
@@ -321,7 +383,7 @@ export const LoginPage: React.FC = () => {
                     if (errorMessage) setErrorMessage(null);
                   }}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-11 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white focus:border-transparent transition"
+                  className="w-full pl-10 pr-11 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
                 />
                 <button
                   type="button"
@@ -339,7 +401,7 @@ export const LoginPage: React.FC = () => {
               type="submit"
               id="btn-login-submit"
               disabled={isSubmitting}
-              className="w-full mt-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              className="w-full mt-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-sm transition active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
@@ -356,20 +418,12 @@ export const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Role Info Box */}
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center gap-2.5">
-            <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-            <span>
-              Citizens are routed to <strong>Complaints</strong> and Admins are routed to <strong>Admin Console</strong> automatically.
-            </span>
-          </div>
-
           {/* Footer Link to Signup */}
           <div className="pt-2 border-t border-slate-100 text-center text-xs text-slate-500">
             Don't have a citizen account yet?{' '}
             <Link 
               to="/signup" 
-              className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition"
+              className="font-bold text-blue-600 hover:text-blue-700 hover:underline transition"
             >
               Create Account
             </Link>

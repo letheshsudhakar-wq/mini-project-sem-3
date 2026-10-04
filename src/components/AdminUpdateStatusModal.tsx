@@ -12,6 +12,7 @@ import { StatusBadge } from './StatusBadge';
 import { compressImage } from '../utils/imageCompressor';
 import { storageService } from '../services/storage';
 import { complaintsService } from '../services/complaints';
+import { nativeService } from '../services/nativeService';
 import { useAuth } from '../hooks/useAuth';
 import type { Complaint, ComplaintStatus } from '../types';
 
@@ -57,6 +58,20 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
     };
   }, [isOpen, complaint]);
 
+  const handleNativeCamera = async () => {
+    nativeService.triggerHaptic('light');
+    if (nativeService.isNative()) {
+      const result = await nativeService.capturePhoto();
+      if (result.file && result.dataUrl) {
+        setResolutionPhotoFile(result.file);
+        setPhotoPreview(result.dataUrl);
+        setErrorMsg(null);
+        return;
+      }
+    }
+    fileInputRef.current?.click();
+  };
+
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -70,12 +85,14 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
       const compressed = await compressImage(file);
       setResolutionPhotoFile(compressed);
       setPhotoPreview(URL.createObjectURL(compressed));
+      nativeService.triggerHaptic('light');
     } catch {
       setErrorMsg('Failed to process image preview.');
     }
   };
 
   const handleRemovePhoto = () => {
+    nativeService.triggerHaptic('light');
     setResolutionPhotoFile(null);
     if (photoPreview) {
       URL.revokeObjectURL(photoPreview);
@@ -255,13 +272,14 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
                   </button>
                 </div>
               ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-3.5 text-center cursor-pointer bg-slate-50/50 flex items-center justify-center gap-2"
+                <button
+                  type="button"
+                  onClick={handleNativeCamera}
+                  className="w-full border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-3.5 text-center cursor-pointer bg-slate-50/50 flex items-center justify-center gap-2 active:scale-95 transition"
                 >
                   <Camera className="w-4 h-4 text-blue-600" />
-                  <span className="text-xs font-medium text-slate-700">Attach resolution proof photo</span>
-                </div>
+                  <span className="text-xs font-bold text-slate-700">Attach resolution proof photo</span>
+                </button>
               )}
               <input
                 ref={fileInputRef}

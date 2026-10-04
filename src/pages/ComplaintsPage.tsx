@@ -6,11 +6,14 @@ import {
   AlertCircle, 
   RefreshCw, 
   FileQuestion, 
-  Inbox
+  Inbox,
+  X
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { complaintsService } from '../services/complaints';
 import { ComplaintCard } from '../components/ComplaintCard';
+import { useToast } from '../contexts/ToastContext';
+import { nativeService } from '../services/nativeService';
 import type { Complaint, ComplaintStatus } from '../types';
 
 type FilterStatus = 'all' | ComplaintStatus;
@@ -18,6 +21,7 @@ type SortOrder = 'newest' | 'oldest' | 'most_upvoted';
 
 export const ComplaintsPage: React.FC = () => {
   const { user } = useAuth();
+  const { info, error } = useToast();
 
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -28,17 +32,22 @@ export const ComplaintsPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const fetchMyComplaints = async () => {
+  const fetchMyComplaints = async (isManualRefresh = false) => {
     if (!user) return;
     setIsLoading(true);
     setErrorMsg(null);
 
     try {
-      const { data, error } = await complaintsService.getUserComplaints(user.id);
-      if (error) {
+      const { data, error: fetchErr } = await complaintsService.getUserComplaints(user.id);
+      if (fetchErr) {
         setErrorMsg('Unable to retrieve your complaints. Please check your connection and try again.');
+        if (isManualRefresh) error('Failed to refresh complaints list.');
       } else {
         setComplaints(data || []);
+        if (isManualRefresh) {
+          nativeService.triggerHaptic('success');
+          info('Complaints refreshed');
+        }
       }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Unexpected error fetching your complaints.');
@@ -101,15 +110,15 @@ export const ComplaintsPage: React.FC = () => {
   }, [complaints, statusFilter, searchQuery, sortOrder]);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+    <div className="space-y-4 sm:space-y-6 max-w-5xl mx-auto pb-6 animate-in fade-in duration-200">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
             <Inbox className="w-3.5 h-3.5" />
             Citizen Grievance Records
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
             My Complaints
           </h1>
           <p className="text-xs sm:text-sm text-slate-500">
@@ -119,7 +128,8 @@ export const ComplaintsPage: React.FC = () => {
 
         <Link
           to="/report"
-          className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition active:scale-95 shrink-0"
+          onClick={() => nativeService.triggerHaptic('light')}
+          className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-4 py-3 rounded-2xl shadow-sm transition active:scale-95 shrink-0"
         >
           <PlusCircle className="w-4 h-4" />
           Report New Issue
@@ -127,54 +137,74 @@ export const ComplaintsPage: React.FC = () => {
       </div>
 
       {/* Filter Tabs & Search Controls */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs space-y-4">
-        {/* Status Tab Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-xs font-semibold">
+      <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
+        {/* Status Tab Pills with no-scrollbar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar text-xs font-semibold -mx-1 px-1">
           {[
-            { key: 'all', label: 'All Complaints' },
+            { key: 'all', label: 'All' },
             { key: 'reported', label: 'Reported' },
             { key: 'in_progress', label: 'In Progress' },
             { key: 'resolved', label: 'Resolved' },
             { key: 'rejected', label: 'Rejected' },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setStatusFilter(tab.key as FilterStatus)}
-              className={`px-3.5 py-2 rounded-xl transition shrink-0 flex items-center gap-1.5 cursor-pointer ${
-                statusFilter === tab.key
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                statusFilter === tab.key ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'
-              }`}>
-                {statusCounts[tab.key] || 0}
-              </span>
-            </button>
-          ))}
+          ].map((tab) => {
+            const isSelected = statusFilter === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => {
+                  nativeService.triggerHaptic('light');
+                  setStatusFilter(tab.key as FilterStatus);
+                }}
+                className={`px-3.5 py-2 rounded-2xl transition shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer ${
+                  isSelected
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-slate-50'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  isSelected ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {statusCounts[tab.key] || 0}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Search & Sort Controls */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2 border-t border-slate-100">
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by keywords, category, or address..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
+              placeholder="Search by description, category, address..."
+              className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                aria-label="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative w-full sm:w-auto">
+            <div className="relative flex-1 sm:flex-none">
               <select
                 value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                className="w-full sm:w-auto px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
+                onChange={(e) => {
+                  nativeService.triggerHaptic('light');
+                  setSortOrder(e.target.value as SortOrder);
+                }}
+                className="w-full sm:w-auto px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
@@ -183,11 +213,12 @@ export const ComplaintsPage: React.FC = () => {
             </div>
 
             <button
-              onClick={fetchMyComplaints}
+              type="button"
+              onClick={() => fetchMyComplaints(true)}
               title="Refresh complaints list"
-              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl border border-slate-200 transition shrink-0"
+              className="p-2.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-2xl border border-slate-200 transition shrink-0 active:scale-95 cursor-pointer"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
             </button>
           </div>
         </div>
@@ -195,14 +226,15 @@ export const ComplaintsPage: React.FC = () => {
 
       {/* Error State */}
       {errorMsg && (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center space-y-3">
+        <div className="bg-rose-50 border border-rose-200 rounded-3xl p-6 text-center space-y-3">
           <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto">
             <AlertCircle className="w-6 h-6" />
           </div>
-          <p className="text-sm font-semibold text-rose-800">{errorMsg}</p>
+          <p className="text-xs sm:text-sm font-semibold text-rose-800">{errorMsg}</p>
           <button
-            onClick={fetchMyComplaints}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-xs transition"
+            type="button"
+            onClick={() => fetchMyComplaints(true)}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-xs transition active:scale-95 cursor-pointer"
           >
             Try Again
           </button>
@@ -211,24 +243,24 @@ export const ComplaintsPage: React.FC = () => {
 
       {/* Skeleton Loading State */}
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4 animate-pulse">
+            <div key={i} className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-2xs space-y-3 animate-pulse">
               <div className="flex justify-between items-center">
                 <div className="w-24 h-5 bg-slate-200 rounded-lg" />
                 <div className="w-20 h-5 bg-slate-200 rounded-full" />
               </div>
-              <div className="flex gap-4">
-                <div className="w-20 h-20 bg-slate-200 rounded-xl shrink-0" />
+              <div className="flex gap-3">
+                <div className="w-20 h-20 bg-slate-200 rounded-2xl shrink-0" />
                 <div className="flex-1 space-y-2">
                   <div className="w-full h-4 bg-slate-200 rounded" />
                   <div className="w-2/3 h-4 bg-slate-200 rounded" />
                   <div className="w-1/2 h-3 bg-slate-100 rounded" />
                 </div>
               </div>
-              <div className="pt-3 border-t border-slate-100 flex justify-between">
-                <div className="w-24 h-4 bg-slate-200 rounded" />
-                <div className="w-16 h-4 bg-slate-200 rounded" />
+              <div className="pt-2 border-t border-slate-100 flex justify-between">
+                <div className="w-24 h-3 bg-slate-200 rounded" />
+                <div className="w-16 h-3 bg-slate-200 rounded" />
               </div>
             </div>
           ))}
@@ -237,13 +269,13 @@ export const ComplaintsPage: React.FC = () => {
 
       {/* Empty State */}
       {!isLoading && !errorMsg && filteredComplaints.length === 0 && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-4 shadow-xs">
-          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto">
+        <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-12 text-center space-y-4 shadow-2xs">
+          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto">
             <FileQuestion className="w-8 h-8" />
           </div>
 
           <div className="space-y-1 max-w-sm mx-auto">
-            <h3 className="text-lg font-bold text-slate-900">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900">
               {complaints.length === 0 ? 'No complaints yet' : 'No matching complaints found'}
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
@@ -257,7 +289,8 @@ export const ComplaintsPage: React.FC = () => {
             <div className="pt-2">
               <Link
                 to="/report"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl shadow-sm transition active:scale-95"
+                onClick={() => nativeService.triggerHaptic('light')}
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-5 py-3 rounded-2xl shadow-sm transition active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
                 Report an Issue
@@ -265,11 +298,12 @@ export const ComplaintsPage: React.FC = () => {
             </div>
           ) : (
             <button
+              type="button"
               onClick={() => {
                 setStatusFilter('all');
                 setSearchQuery('');
               }}
-              className="text-xs font-semibold text-blue-600 hover:underline"
+              className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
             >
               Clear filters
             </button>
@@ -279,7 +313,7 @@ export const ComplaintsPage: React.FC = () => {
 
       {/* Complaints Grid */}
       {!isLoading && !errorMsg && filteredComplaints.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           {filteredComplaints.map((complaint) => (
             <ComplaintCard key={complaint.id} complaint={complaint} />
           ))}

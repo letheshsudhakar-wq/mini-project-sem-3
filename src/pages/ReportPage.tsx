@@ -13,7 +13,10 @@ import {
   AlertTriangle, 
   ArrowRight,
   FileText,
-  Layers
+  Layers,
+  Sparkles,
+  Copy,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { complaintsService } from '../services/complaints';
@@ -22,6 +25,9 @@ import { reverseGeocode } from '../services/geocoding';
 import { compressImage } from '../utils/imageCompressor';
 import { COMPLAINT_CATEGORIES } from '../utils/constants';
 import { LocationPickerMap } from '../components/LocationPickerMap';
+import { nativeService } from '../services/nativeService';
+import { aiService, type AIAssessmentResult } from '../services/aiService';
+import { useToast } from '../contexts/ToastContext';
 import type { ComplaintCategory, NearbyComplaint, Complaint } from '../types';
 
 // Default initial coordinates (Fallback to a central location: e.g. New Delhi / NYC central)
@@ -29,7 +35,8 @@ const DEFAULT_LATITUDE = 28.6139;
 const DEFAULT_LONGITUDE = 77.2090;
 
 export const ReportPage: React.FC = () => {
-  const { user, isConfigured } = useAuth();
+  const { user } = useAuth();
+  const { success, error: toastError, warning, info } = useToast();
 
   // Form States
   const [category, setCategory] = useState<ComplaintCategory>('pothole');
@@ -43,6 +50,10 @@ export const ReportPage: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
+  // AI Assistance States
+  const [aiAssessment, setAiAssessment] = useState<AIAssessmentResult | null>(null);
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+
   // Loading States
   const [isLocating, setIsLocating] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -55,6 +66,7 @@ export const ReportPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [nearbyDuplicates, setNearbyDuplicates] = useState<NearbyComplaint[]>([]);
   const [hasAcknowledgedDuplicates, setHasAcknowledgedDuplicates] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
 
   // Success Confirmation State
   const [submittedComplaint, setSubmittedComplaint] = useState<Complaint | null>(null);
@@ -62,6 +74,7 @@ export const ReportPage: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const geocodeAbortRef = useRef<AbortController | null>(null);
+  const aiTimeoutRef = useRef<any>(null);
 
   // Auto-fetch reverse geocoding when coordinates change
   const fetchAddress = useCallback(async (lat: number, lng: number) => {
@@ -74,7 +87,7 @@ export const ReportPage: React.FC = () => {
     try {
       const result = await reverseGeocode(lat, lng, geocodeAbortRef.current.signal);
       setAddress(result.address);
-    } catch (err) {
+    } catch {
       setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
     } finally {
       setIsGeocoding(false);
@@ -90,99 +103,122 @@ export const ReportPage: React.FC = () => {
     fetchAddress(coords.lat, coords.lng);
   };
 
-  // Capture GPS Location
-  const handleGetGPSLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser. Please place the pin manually on the map.');
-      return;
-    }
-
+  // Capture GPS Location with native & web support
+  const handleGetGPSLocation = async () => {
     setIsLocating(true);
     setLocationError(null);
+    nativeService.triggerHaptic('light');
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setLatitude(lat);
-        setLongitude(lng);
-        setIsLocating(false);
-        setHasAcknowledgedDuplicates(false);
-        fetchAddress(lat, lng);
-      },
-      (error) => {
-        setIsLocating(false);
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            setLocationError('Location permission denied. Please place the pin manually on the map.');
-            break;
-          case error.POSITION_UNAVAILABLE:
-            setLocationError('GPS position unavailable. Please place the pin manually on the map.');
-            break;
-          case error.TIMEOUT:
-            setLocationError('GPS location request timed out. Please place the pin manually on the map.');
-            break;
-          default:
-            setLocationError('Unable to access your location. Please place the pin manually on the map.');
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000,
-      }
-    );
+    try {
+      const pos = await nativeService.getCurrentLocation();
+      setLatitude(pos.latitude);
+      setLongitude(pos.longitude);
+      setIsLocating(false);
+      setHasAcknowledgedDuplicates(false);
+      fetchAddress(pos.latitude, pos.longitude);
+      nativeService.triggerHaptic('success');
+      info('Location updated from device GPS');
+    } catch (err: any) {
+      setIsLocating(false);
+      const msg = err?.message || 'Unable to access your location. Please place the pin manually on the map.';
+      setLocationError(msg);
+      warning(msg);
+    }
   };
 
   // Initial geocoding & optional GPS check on mount
   useEffect(() => {
     fetchAddress(DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
-    // Attempt graceful GPS on initial load
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLatitude(pos.coords.latitude);
-          setLongitude(pos.coords.longitude);
-          fetchAddress(pos.coords.latitude, pos.coords.longitude);
-        },
-        () => {
-          // Silent fallback on initial load
-        },
-        { timeout: 5000 }
-      );
-    }
+    nativeService.getCurrentLocation().then(
+      (pos) => {
+        setLatitude(pos.latitude);
+        setLongitude(pos.longitude);
+        fetchAddress(pos.latitude, pos.longitude);
+      },
+      () => {
+        // Silent fallback on initial load
+      }
+    );
   }, [fetchAddress]);
 
-  // Handle Photo selection
+  // AI-Assisted Text Analysis
+  useEffect(() => {
+    if (aiTimeoutRef.current) clearTimeout(aiTimeoutRef.current);
+
+    if (description.trim().length >= 10) {
+      aiTimeoutRef.current = setTimeout(async () => {
+        setIsAiAnalyzing(true);
+        try {
+          const res = await aiService.analyzeGrievanceText(description);
+          setAiAssessment(res);
+        } catch {
+          // Non-blocking
+        } finally {
+          setIsAiAnalyzing(false);
+        }
+      }, 500);
+    } else {
+      setAiAssessment(null);
+    }
+
+    return () => {
+      if (aiTimeoutRef.current) clearTimeout(aiTimeoutRef.current);
+    };
+  }, [description]);
+
+  // Apply AI Suggestion
+  const handleApplyAiCategory = () => {
+    if (aiAssessment?.suggestedCategory) {
+      nativeService.triggerHaptic('light');
+      setCategory(aiAssessment.suggestedCategory);
+      success(`Applied category: ${COMPLAINT_CATEGORIES.find(c => c.value === aiAssessment.suggestedCategory)?.label}`);
+    }
+  };
+
+  // Handle Photo selection (via Native Camera or File Picker)
+  const handleNativeCamera = async () => {
+    nativeService.triggerHaptic('light');
+    if (nativeService.isNative()) {
+      const result = await nativeService.capturePhoto();
+      if (result.file && result.dataUrl) {
+        setSelectedFile(result.file);
+        setPreviewUrl(result.dataUrl);
+        setImageError(null);
+        return;
+      }
+    }
+    // Fallback to browser file input
+    fileInputRef.current?.click();
+  };
+
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setImageError(null);
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate type
     if (!file.type.startsWith('image/')) {
       setImageError('Please select a valid image file (JPEG, PNG, WebP).');
       return;
     }
 
-    // Validate maximum file size (10MB limit before compression)
     if (file.size > 10 * 1024 * 1024) {
       setImageError('Selected image is too large (max 10MB). Please select a smaller photo.');
       return;
     }
 
     try {
-      // Compress and resize image in client
       const compressed = await compressImage(file);
       setSelectedFile(compressed);
       const preview = URL.createObjectURL(compressed);
       setPreviewUrl(preview);
-    } catch (err) {
+      nativeService.triggerHaptic('light');
+    } catch {
       setImageError('Failed to process image preview. Please try another file.');
     }
   };
 
   const handleRemovePhoto = () => {
+    nativeService.triggerHaptic('light');
     setSelectedFile(null);
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
@@ -202,17 +238,21 @@ export const ReportPage: React.FC = () => {
 
     setIsUpvoting(complaintId);
     setFormError(null);
+    nativeService.triggerHaptic('medium');
 
     try {
-      const { error } = await complaintsService.addUpvote(complaintId, user.id);
-      if (error) {
-        if (error.message?.includes('duplicate key') || (error as any).code === '23505') {
+      const { error: uvError } = await complaintsService.addUpvote(complaintId, user.id);
+      if (uvError) {
+        if (uvError.message?.includes('duplicate key') || (uvError as any).code === '23505') {
           setUpvoteSuccessMessage('You have already upvoted this complaint! Thank you for supporting community resolution.');
         } else {
           setFormError('Failed to record upvote. Please try again.');
+          toastError('Failed to record upvote.');
         }
       } else {
+        nativeService.triggerHaptic('success');
         setUpvoteSuccessMessage('Upvote recorded successfully! Priority has been increased for this issue.');
+        success('Upvoted existing issue to increase resolution priority!');
       }
     } catch (err: any) {
       setFormError(err?.message || 'Error processing upvote.');
@@ -228,10 +268,10 @@ export const ReportPage: React.FC = () => {
 
     if (!user) {
       setFormError('You must be signed in to submit a grievance report.');
+      toastError('Please sign in first.');
       return;
     }
 
-    // 1. Validation: Description
     const trimmedDesc = description.trim();
     if (!trimmedDesc) {
       setFormError('Please enter a description of the issue.');
@@ -243,13 +283,12 @@ export const ReportPage: React.FC = () => {
       return;
     }
 
-    // 2. Validation: Location
     if (!latitude || !longitude) {
       setFormError('Please select a valid location on the map.');
       return;
     }
 
-    // 3. Nearby Duplicate Detection Check (unless user already clicked "Report Anyway")
+    // Nearby Duplicate Detection Check
     if (!bypassDuplicateCheck && !hasAcknowledgedDuplicates) {
       setIsCheckingDuplicates(true);
       const { data: duplicates } = await complaintsService.checkNearbyComplaints(
@@ -262,19 +301,19 @@ export const ReportPage: React.FC = () => {
 
       if (duplicates && duplicates.length > 0) {
         setNearbyDuplicates(duplicates);
-        // Scroll to warning
+        nativeService.triggerHaptic('warning');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
     }
 
-    // 4. Submit Complaint
+    // Submit Complaint
     setIsSubmitting(true);
+    nativeService.triggerHaptic('medium');
 
     try {
       let photoUrl: string | null = null;
 
-      // Upload image if selected
       if (selectedFile) {
         const { url, error: uploadError } = await storageService.uploadComplaintImage(
           selectedFile,
@@ -286,13 +325,13 @@ export const ReportPage: React.FC = () => {
           setFormError(
             'Failed to upload image. Please verify your internet connection or try again without a photo.'
           );
+          toastError('Photo upload failed.');
           return;
         }
 
         photoUrl = url;
       }
 
-      // Create complaint record in Supabase
       const { data: newComplaint, error: createError } = await complaintsService.createComplaint({
         userId: user.id,
         category,
@@ -307,19 +346,21 @@ export const ReportPage: React.FC = () => {
 
       if (createError || !newComplaint) {
         setFormError(createError?.message || 'Failed to submit complaint. Please try again.');
+        toastError('Failed to submit complaint.');
         return;
       }
 
-      // Show confirmation success screen
+      nativeService.triggerHaptic('success');
+      success('Grievance registered successfully!');
       setSubmittedComplaint(newComplaint);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       setIsSubmitting(false);
       setFormError(err?.message || 'An unexpected error occurred while submitting.');
+      toastError('Submission failed.');
     }
   };
 
-  // Reset form to report another grievance
   const handleResetForm = () => {
     setDescription('');
     handleRemovePhoto();
@@ -329,6 +370,16 @@ export const ReportPage: React.FC = () => {
     setUpvoteSuccessMessage(null);
     setFormError(null);
     setLocationError(null);
+    setAiAssessment(null);
+  };
+
+  const handleCopySubmittedId = () => {
+    if (!submittedComplaint) return;
+    navigator.clipboard.writeText(submittedComplaint.id);
+    setCopiedId(true);
+    nativeService.triggerHaptic('light');
+    info('Tracking ID copied');
+    setTimeout(() => setCopiedId(false), 2000);
   };
 
   // ============================================================================
@@ -338,37 +389,47 @@ export const ReportPage: React.FC = () => {
     const categoryInfo = COMPLAINT_CATEGORIES.find((c) => c.value === submittedComplaint.category);
 
     return (
-      <div className="max-w-2xl mx-auto py-6 px-4 animate-in fade-in duration-300">
+      <div className="max-w-2xl mx-auto py-4 sm:py-6 px-2 sm:px-4 animate-in fade-in duration-300">
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           {/* Success Banner */}
-          <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-8 text-white text-center space-y-3">
+          <div className="bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 sm:p-8 text-white text-center space-y-3">
             <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center mx-auto shadow-inner border border-white/30">
               <CheckCircle2 className="w-9 h-9 text-white" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Grievance Submitted</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Grievance Submitted</h1>
             <p className="text-emerald-100 text-xs sm:text-sm max-w-md mx-auto">
               Your civic report has been securely registered in the municipal database and assigned for review.
             </p>
           </div>
 
           {/* Details Overview */}
-          <div className="p-6 sm:p-8 space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-5 sm:p-8 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Tracking ID
                 </span>
-                <p className="text-xs font-mono font-bold text-slate-800 break-all">
-                  {submittedComplaint.id}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-mono font-bold text-slate-800 truncate">
+                    {submittedComplaint.id}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleCopySubmittedId}
+                    className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-600 transition cursor-pointer"
+                    title="Copy tracking ID"
+                  >
+                    {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </div>
 
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Current Status
                 </span>
                 <div>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg text-xs font-bold uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-800 rounded-xl text-xs font-bold uppercase tracking-wider">
                     <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
                     Reported
                   </span>
@@ -376,16 +437,16 @@ export const ReportPage: React.FC = () => {
               </div>
 
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Category
                 </span>
-                <p className="text-sm font-bold text-slate-900">
+                <p className="text-xs sm:text-sm font-bold text-slate-900">
                   {categoryInfo?.label || submittedComplaint.category}
                 </p>
               </div>
 
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Registered Address
                 </span>
                 <p className="text-xs font-medium text-slate-700 leading-relaxed line-clamp-2">
@@ -396,8 +457,8 @@ export const ReportPage: React.FC = () => {
 
             {submittedComplaint.photo_url && (
               <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-slate-700">Uploaded Evidence Photo</span>
-                <div className="w-full h-44 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
+                <span className="text-xs font-bold text-slate-700">Uploaded Evidence Photo</span>
+                <div className="w-full h-40 sm:h-48 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
                   <img
                     src={submittedComplaint.photo_url}
                     alt="Submitted complaint issue evidence"
@@ -408,24 +469,26 @@ export const ReportPage: React.FC = () => {
             )}
 
             {/* Action Buttons */}
-            <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-3">
+            <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-2.5">
               <Link
                 to={`/complaints/${submittedComplaint.id}`}
-                className="w-full sm:flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-sm transition text-center flex items-center justify-center gap-2"
+                onClick={() => nativeService.triggerHaptic('light')}
+                className="w-full sm:flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-sm transition text-center flex items-center justify-center gap-2 active:scale-95"
               >
                 <FileText className="w-4 h-4" />
-                <span>View Complaint</span>
+                <span>View Details & Timeline</span>
               </Link>
               <Link
                 to="/complaints"
-                className="w-full sm:flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold rounded-xl transition text-center"
+                onClick={() => nativeService.triggerHaptic('light')}
+                className="w-full sm:flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-2xl transition text-center active:scale-95"
               >
                 My Complaints
               </Link>
               <button
                 type="button"
                 onClick={handleResetForm}
-                className="w-full sm:w-auto py-3 px-4 text-blue-600 hover:text-blue-700 text-sm font-semibold rounded-xl hover:bg-blue-50 transition text-center"
+                className="w-full sm:w-auto py-3 px-4 text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-bold rounded-2xl hover:bg-blue-50 transition text-center active:scale-95 cursor-pointer"
               >
                 Report Another
               </button>
@@ -437,32 +500,33 @@ export const ReportPage: React.FC = () => {
   }
 
   // ============================================================================
-  // UPVOTE SUCCESS SCREEN (When user upvoted an existing issue instead)
+  // UPVOTE SUCCESS SCREEN
   // ============================================================================
   if (upvoteSuccessMessage) {
     return (
-      <div className="max-w-2xl mx-auto py-8 px-4">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center space-y-6">
-          <div className="w-16 h-16 bg-amber-50 border border-amber-200 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
+      <div className="max-w-2xl mx-auto py-6 px-4 animate-in fade-in">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 text-center space-y-5">
+          <div className="w-16 h-16 bg-amber-50 border border-amber-200 text-amber-600 rounded-3xl flex items-center justify-center mx-auto">
             <ThumbsUp className="w-8 h-8" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-slate-900">Community Support Recorded</h1>
-            <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">Community Support Recorded</h1>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
               {upvoteSuccessMessage}
             </p>
           </div>
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2.5">
             <Link
               to="/complaints"
-              className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-sm transition"
+              onClick={() => nativeService.triggerHaptic('light')}
+              className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-sm transition active:scale-95"
             >
               Browse Complaints
             </Link>
             <button
               type="button"
               onClick={handleResetForm}
-              className="w-full sm:w-auto px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition"
+              className="w-full sm:w-auto px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-2xl transition active:scale-95 cursor-pointer"
             >
               Report a Different Issue
             </button>
@@ -476,36 +540,26 @@ export const ReportPage: React.FC = () => {
   // MAIN REPORT FORM
   // ============================================================================
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-8 animate-in fade-in duration-200">
       {/* Page Header */}
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
           <Layers className="w-3.5 h-3.5" />
           Civic Grievance Filing
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
           Report a Civic Grievance
         </h1>
-        <p className="text-sm text-slate-500 max-w-2xl">
+        <p className="text-xs sm:text-sm text-slate-500 max-w-2xl">
           Provide issue details, pin the exact coordinates on the map, and attach photographic evidence for swift municipal action.
         </p>
       </div>
-
-      {/* Configuration check warning banner */}
-      {!isConfigured && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <strong>Notice:</strong> Supabase credentials are pending in <code className="font-mono">.env</code>. Submissions will require configured API keys.
-          </div>
-        </div>
-      )}
 
       {/* Top Form Error Alert */}
       {formError && (
         <div 
           role="alert" 
-          className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs sm:text-sm text-rose-800 flex items-start gap-3 animate-in fade-in"
+          className="p-4 bg-rose-50 border border-rose-200 rounded-3xl text-xs sm:text-sm text-rose-800 flex items-start gap-3 animate-in fade-in"
         >
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div className="flex-1 font-medium">{formError}</div>
@@ -514,15 +568,15 @@ export const ReportPage: React.FC = () => {
 
       {/* NEARBY DUPLICATE DETECTION WARNING */}
       {nearbyDuplicates.length > 0 && !hasAcknowledgedDuplicates && (
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-6 space-y-4 animate-in fade-in">
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-4 sm:p-6 space-y-4 animate-in fade-in shadow-sm">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-amber-900">Possible Existing Issue Nearby</h3>
+              <h3 className="text-sm sm:text-base font-extrabold text-amber-900">Possible Existing Issue Nearby</h3>
               <p className="text-xs text-amber-700 mt-0.5">
-                We found <strong>{nearbyDuplicates.length}</strong> unresolved complaint(s) of the same category within 100 meters of your selected location. You can upvote the existing report to boost its priority or continue reporting.
+                We found <strong>{nearbyDuplicates.length}</strong> unresolved complaint(s) of the same category within 100 meters. You can upvote an existing report to boost its priority or continue filing.
               </p>
             </div>
           </div>
@@ -532,11 +586,11 @@ export const ReportPage: React.FC = () => {
             {nearbyDuplicates.map((dup) => (
               <div 
                 key={dup.id} 
-                className="bg-white p-4 rounded-2xl border border-amber-200 shadow-xs flex flex-col justify-between space-y-3"
+                className="bg-white p-4 rounded-2xl border border-amber-200 shadow-2xs flex flex-col justify-between space-y-3"
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg">
                       {dup.category}
                     </span>
                     <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
@@ -544,7 +598,7 @@ export const ReportPage: React.FC = () => {
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-700 line-clamp-2 leading-relaxed">
+                  <p className="text-xs text-slate-700 line-clamp-2 leading-relaxed font-medium">
                     "{dup.description}"
                   </p>
 
@@ -564,7 +618,7 @@ export const ReportPage: React.FC = () => {
                   type="button"
                   onClick={() => handleUpvoteExisting(dup.id)}
                   disabled={isUpvoting === dup.id}
-                  className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-xs"
+                  className="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-xs active:scale-95 cursor-pointer"
                 >
                   {isUpvoting === dup.id ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -577,9 +631,9 @@ export const ReportPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Citizen choice footer */}
+          {/* Choice footer */}
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-amber-200/80">
-            <span className="text-xs text-amber-800">
+            <span className="text-xs text-amber-800 font-medium">
               Is your grievance distinct from the listed issues?
             </span>
             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -589,40 +643,40 @@ export const ReportPage: React.FC = () => {
                   setHasAcknowledgedDuplicates(true);
                   handleSubmit(undefined, true);
                 }}
-                className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition shadow-xs"
+                className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition shadow-xs active:scale-95 cursor-pointer"
               >
                 Report Anyway
               </button>
               <button
                 type="button"
                 onClick={() => setNearbyDuplicates([])}
-                className="w-full sm:w-auto px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition"
+                className="w-full sm:w-auto px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition active:scale-95 cursor-pointer"
               >
-                Cancel / Adjust Pin
+                Adjust Location Pin
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Main Two-Column Responsive Layout */}
+      {/* Main Form */}
       <form onSubmit={(e) => handleSubmit(e, false)}>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
           {/* ============================================================== */}
           {/* LEFT COLUMN: Issue Category, Description, Photo Evidence       */}
           {/* ============================================================== */}
-          <div className="lg:col-span-6 space-y-6">
-            <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-              <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
+          <div className="lg:col-span-6 space-y-4 sm:space-y-6">
+            <div className="bg-white p-5 sm:p-7 rounded-3xl border border-slate-200 shadow-2xs space-y-5">
+              <h2 className="text-sm sm:text-base font-extrabold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</span>
-                Issue Information
+                Issue Details & Photos
               </h2>
 
               {/* Category Selector */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label 
                   htmlFor="report-category" 
-                  className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                  className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
                 >
                   Category <span className="text-rose-500">*</span>
                 </label>
@@ -633,7 +687,7 @@ export const ReportPage: React.FC = () => {
                     setCategory(e.target.value as ComplaintCategory);
                     setHasAcknowledgedDuplicates(false);
                   }}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition cursor-pointer"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition cursor-pointer"
                 >
                   {COMPLAINT_CATEGORIES.map((cat) => (
                     <option key={cat.value} value={cat.value}>
@@ -647,16 +701,16 @@ export const ReportPage: React.FC = () => {
               </div>
 
               {/* Description Textarea */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label 
                     htmlFor="report-description" 
-                    className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                    className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
                   >
                     Description <span className="text-rose-500">*</span>
                   </label>
                   <span className={`text-[11px] ${
-                    description.trim().length >= 10 ? 'text-emerald-600 font-semibold' : 'text-slate-400'
+                    description.trim().length >= 10 ? 'text-emerald-600 font-bold' : 'text-slate-400'
                   }`}>
                     {description.trim().length}/10 min chars
                   </span>
@@ -667,19 +721,70 @@ export const ReportPage: React.FC = () => {
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe the issue, its location, severity, or any details that may help resolve it."
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition resize-none leading-relaxed"
+                  placeholder="Describe the issue, landmarks, hazard level, or relevant details for municipal workers..."
+                  className="w-full p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition resize-none leading-relaxed"
                 />
               </div>
 
-              {/* Photo Upload (Optional) */}
+              {/* AI Smart Assistant Assessment Pill */}
+              {description.trim().length >= 10 && (
+                <div className="p-3.5 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-200/80 rounded-2xl space-y-2 animate-in fade-in">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5 font-bold text-blue-900">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      AI Grievance Assistant
+                    </span>
+                    {isAiAnalyzing ? (
+                      <span className="text-[11px] text-blue-600 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Analyzing...
+                      </span>
+                    ) : aiAssessment ? (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        aiAssessment.severity === 'urgent'
+                          ? 'bg-rose-100 text-rose-800'
+                          : aiAssessment.severity === 'high'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        Priority: {aiAssessment.severity}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {aiAssessment && (
+                    <div className="text-xs text-slate-700 space-y-1.5">
+                      {aiAssessment.suggestedCategory !== category && (
+                        <div className="flex items-center justify-between bg-white p-2 rounded-xl border border-blue-200">
+                          <span className="text-[11px] text-slate-600">
+                            Suggested category: <strong>{COMPLAINT_CATEGORIES.find(c => c.value === aiAssessment.suggestedCategory)?.label}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleApplyAiCategory}
+                            className="px-2.5 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-bold active:scale-95 transition"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      )}
+                      {aiAssessment.safetyAdvisory && (
+                        <p className="text-[11px] text-blue-800 italic">
+                          💡 {aiAssessment.safetyAdvisory}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Photo Upload (Native Camera / Gallery Picker) */}
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Photo Evidence <span className="text-slate-400 font-normal lowercase">(optional)</span>
                 </label>
 
                 {imageError && (
-                  <p className="text-xs text-rose-600 font-medium flex items-center gap-1">
+                  <p className="text-xs text-rose-600 font-semibold flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
                     {imageError}
                   </p>
@@ -690,13 +795,13 @@ export const ReportPage: React.FC = () => {
                     <img
                       src={previewUrl}
                       alt="Selected issue preview"
-                      className="w-full h-48 sm:h-56 object-cover"
+                      className="w-full h-44 sm:h-52 object-cover"
                     />
                     <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
                       <button
                         type="button"
                         onClick={handleRemovePhoto}
-                        className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md transition active:scale-95"
+                        className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition active:scale-95 cursor-pointer"
                       >
                         <X className="w-4 h-4" />
                         Remove Photo
@@ -712,20 +817,30 @@ export const ReportPage: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/30 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
-                  >
-                    <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition">
-                      <Camera className="w-5 h-5" />
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-xs font-bold text-slate-700">
-                        Click or tap to attach a photo
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        Supports JPEG, PNG, WebP (Auto-compressed on device)
-                      </p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Camera Button */}
+                    <button
+                      type="button"
+                      onClick={handleNativeCamera}
+                      className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/40 rounded-2xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-1.5 active:scale-95"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <Camera className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700">Take Photo</span>
+                      <span className="text-[10px] text-slate-400">Camera / Gallery</span>
+                    </button>
+
+                    {/* File Upload Button */}
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/40 rounded-2xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-1.5 active:scale-95"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700">Browse Files</span>
+                      <span className="text-[10px] text-slate-400">JPEG, PNG, WebP</span>
                     </div>
                   </div>
                 )}
@@ -744,12 +859,12 @@ export const ReportPage: React.FC = () => {
           {/* ============================================================== */}
           {/* RIGHT COLUMN: Location Map & Coordinates                       */}
           {/* ============================================================== */}
-          <div className="lg:col-span-6 space-y-6">
-            <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+          <div className="lg:col-span-6 space-y-4 sm:space-y-6">
+            <div className="bg-white p-5 sm:p-7 rounded-3xl border border-slate-200 shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">2</span>
-                  Location & Map
+                  Location & Map Pin
                 </h2>
 
                 {/* GPS Trigger Button */}
@@ -757,7 +872,7 @@ export const ReportPage: React.FC = () => {
                   type="button"
                   onClick={handleGetGPSLocation}
                   disabled={isLocating}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-xl border border-blue-200 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 transition active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {isLocating ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
@@ -770,7 +885,7 @@ export const ReportPage: React.FC = () => {
 
               {/* Location Error / Fallback alert */}
               {locationError && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 flex items-start gap-2.5 animate-in fade-in">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 flex items-start gap-2 animate-in fade-in">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <span>{locationError}</span>
                 </div>
@@ -782,13 +897,13 @@ export const ReportPage: React.FC = () => {
                   latitude={latitude}
                   longitude={longitude}
                   onLocationChange={handleLocationChange}
-                  className="h-64 sm:h-80"
+                  className="h-56 sm:h-72"
                 />
               </div>
 
               {/* Reverse Geocoded Address Readout */}
               <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
-                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <span className="flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-blue-600" />
                     Estimated Street Address
@@ -799,10 +914,10 @@ export const ReportPage: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-xs font-medium text-slate-800 leading-relaxed">
+                <p className="text-xs font-bold text-slate-800 leading-relaxed">
                   {address || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`}
                 </p>
-                <div className="flex items-center gap-4 text-[10px] text-slate-400 font-mono pt-1">
+                <div className="flex items-center gap-4 text-[10px] text-slate-400 font-mono pt-0.5">
                   <span>Lat: {latitude.toFixed(5)}</span>
                   <span>Lng: {longitude.toFixed(5)}</span>
                 </div>
@@ -813,18 +928,18 @@ export const ReportPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting || isCheckingDuplicates}
-                  className="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold text-sm rounded-2xl shadow-md shadow-blue-500/20 transition active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-md shadow-blue-500/20 transition active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {isSubmitting || isCheckingDuplicates ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       <span>
-                        {isCheckingDuplicates ? 'Checking Nearby Issues...' : 'Submitting Grievance...'}
+                        {isCheckingDuplicates ? 'Scanning Nearby Issues...' : 'Submitting Grievance...'}
                       </span>
                     </>
                   ) : (
                     <>
-                      <Upload className="w-5 h-5" />
+                      <Upload className="w-4 h-4" />
                       <span>Submit Grievance Report</span>
                       <ArrowRight className="w-4 h-4 ml-1 opacity-70" />
                     </>
