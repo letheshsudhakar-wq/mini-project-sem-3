@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   ShieldCheck, 
   Search, 
@@ -9,16 +8,22 @@ import {
   ChevronRight, 
   Eye, 
   AlertCircle, 
-  ThumbsUp, 
+  AlertTriangle,
+  Clock,
+  Repeat2,
+  BellRing,
   X
 } from 'lucide-react';
 import { complaintsService } from '../services/complaints';
+import { nativeService } from '../services/nativeService';
 import { AdminStatusCards } from '../components/AdminStatusCards';
 import { AdminComplaintDetailModal } from '../components/AdminComplaintDetailModal';
 import { AdminUpdateStatusModal } from '../components/AdminUpdateStatusModal';
+import { RecurringIssueModal } from '../components/RecurringIssueModal';
 import { CivicPriorityScore } from '../components/CivicPriorityScore';
 import { StatusBadge } from '../components/StatusBadge';
-import { COMPLAINT_CATEGORIES } from '../utils/constants';
+import { COMPLAINT_CATEGORIES, GOVERNMENT_DEPARTMENTS } from '../utils/constants';
+import { analyzeRecurringIssues, type RecurringIssue } from '../utils/recurringIssues';
 import type { 
   Complaint, 
   ComplaintCategory, 
@@ -44,7 +49,8 @@ export const AdminPage: React.FC = () => {
   // Complaints Table State
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [attentionComplaints, setAttentionComplaints] = useState<Complaint[]>([]);
-  const [similarReportCounts, setSimilarReportCounts] = useState<Record<string, number | null>>({});
+  const [similarReportCounts] = useState<Record<string, number | null>>({});
+  const [selectedRecurringIssue, setSelectedRecurringIssue] = useState<RecurringIssue | null>(null);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [isLoadingComplaints, setIsLoadingComplaints] = useState<boolean>(true);
@@ -93,14 +99,26 @@ export const AdminPage: React.FC = () => {
 
     if (response.error) {
       setErrorMsg('Failed to load administrative complaints list.');
-      if (isManual) error('Failed to refresh data.');
+      if (isManual) setErrorMsg('Failed to refresh data.');
     } else {
       setComplaints(response.data);
       setTotalCount(response.totalCount);
       setTotalPages(response.totalPages);
     }
     setIsLoadingComplaints(false);
-  }, [selectedCategory, selectedStatus, selectedDateRange, searchQuery, sortBy, currentPage]);
+  }, [selectedCategory, selectedDepartment, selectedStatus, selectedDateRange, searchQuery, sortBy, currentPage]);
+
+  const fetchAttentionComplaints = useCallback(async () => {
+    const response = await complaintsService.getAdminComplaints({
+      status: 'reported',
+      sortBy: 'newest',
+      page: 1,
+      pageSize: 20,
+    });
+    if (response.data) {
+      setAttentionComplaints(response.data.filter((c) => c.priority === 'critical' || c.priority === 'high'));
+    }
+  }, []);
 
   useEffect(() => {
     fetchStats();
@@ -113,6 +131,18 @@ export const AdminPage: React.FC = () => {
   useEffect(() => {
     fetchAttentionComplaints();
   }, [fetchAttentionComplaints]);
+
+  const recurringIssues = useMemo(() => analyzeRecurringIssues(complaints), [complaints]);
+
+  const recurringIssueLookup = useMemo(() => {
+    const map = new Map<string, RecurringIssue>();
+    recurringIssues.forEach((issue) => {
+      issue.complaints.forEach((comp) => {
+        map.set(comp.id, issue);
+      });
+    });
+    return map;
+  }, [recurringIssues]);
 
   // Reset page to 1 when filters change
   const handleStatusFilterChange = (st: ComplaintStatus | 'all') => {
@@ -169,13 +199,23 @@ export const AdminPage: React.FC = () => {
     fetchStats();
     fetchComplaints();
     fetchAttentionComplaints();
-    if (refreshSelectedComplaint && inspectingComplaint && inspectingComplaint.id === updated.id) {
+    if (inspectingComplaint && inspectingComplaint.id === updated.id) {
       setInspectingComplaint(updated);
     }
   };
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto pb-8 animate-in fade-in duration-200">
+      {/* Notification Toast */}
+      {notification && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center justify-between">
+          <span>{notification}</span>
+          <button onClick={() => setNotification(null)} className="text-emerald-600 hover:text-emerald-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1">
@@ -194,7 +234,8 @@ export const AdminPage: React.FC = () => {
         <button
           onClick={() => {
             fetchStats();
-            fetchComplaints();
+            fetchComplaints(true);
+            fetchAttentionComplaints();
           }}
           disabled={isLoadingComplaints || isLoadingStats}
           className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
@@ -650,9 +691,10 @@ export const AdminPage: React.FC = () => {
           isOpen={Boolean(inspectingComplaint)}
           complaint={inspectingComplaint}
           onClose={() => setInspectingComplaint(null)}
+          onComplaintUpdated={handleComplaintUpdated}
           onOpenStatusUpdateModal={(c) => {
             setInspectingComplaint(null);
-            setUpdatingComplaint(comp);
+            setUpdatingComplaint(c);
           }}
         />
       )}

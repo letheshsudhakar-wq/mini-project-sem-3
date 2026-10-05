@@ -33,8 +33,14 @@ const CATEGORY_KEYWORDS: Record<ComplaintCategory, string[]> = {
     'garbage', 'waste', 'trash', 'dump', 'bin', 'litter', 'debris', 'rubbish',
     'smell', 'odor', 'hygiene', 'sweeper', 'uncollected', 'dumping'
   ],
+  water_supply: [
+    'water supply', 'drinking water', 'pipeline', 'contamination', 'water leakage', 'low pressure', 'tap', 'water tanker'
+  ],
+  road_damage: [
+    'road damage', 'cracked road', 'uneven road', 'carriageway', 'road surface', 'tar', 'caving road'
+  ],
   other: [
-    'park', 'bench', 'tree', 'graffiti', 'encroachment', 'water supply', 'noise',
+    'park', 'bench', 'tree', 'graffiti', 'encroachment', 'noise',
     'illegal', 'stray', 'signboard'
   ]
 };
@@ -58,6 +64,8 @@ export const aiService = {
       streetlight: 0,
       drainage: 0,
       garbage: 0,
+      water_supply: 0,
+      road_damage: 0,
       other: 0.1,
     };
 

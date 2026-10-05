@@ -5,7 +5,6 @@ import {
   X,
   Check,
   RotateCcw,
-  AlertCircle,
   Upload,
   Zap,
   ZapOff,
