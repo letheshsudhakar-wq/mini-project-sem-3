@@ -5,6 +5,7 @@ import {
   Lock, 
   Mail, 
   AlertCircle, 
+  ShieldAlert,
   Loader2, 
   ShieldCheck, 
   ArrowRight,
@@ -43,14 +44,14 @@ const GoogleIcon: React.FC = () => (
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const isGovernmentLogin = location.pathname === '/government/login';
+  const { success, error: toastError } = useToast();
   const { 
     user, 
     profile, 
     role, 
     signIn, 
-    signInAsDemo,
     signInWithGoogle,
-    signInAsDemo,
     signOut, 
     isAuthenticated, 
     isAdmin, 
@@ -297,7 +298,7 @@ export const LoginPage: React.FC = () => {
               )}
               <span>Continue with Google</span>
             </button>
-          </div>}
+          </div>
 
           {/* Divider */}
           <div className="relative">

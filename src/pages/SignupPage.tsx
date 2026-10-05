@@ -43,7 +43,8 @@ const GoogleIcon: React.FC = () => (
 
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signUp, signInWithGoogle, isDemoMode } = useAuth();
+  const { signUp, signInWithGoogle, isDemoMode, isAuthenticated, role, isAdmin } = useAuth();
+  const { success, error: toastError } = useToast();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
