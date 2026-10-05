@@ -43,6 +43,16 @@ const CATEGORY_MARKER_CONFIG: Record<
     // Trash SVG path
     svgPath: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
   },
+  water_supply: {
+    color: '#0ea5e9',
+    bgGradient: 'linear-gradient(135deg, #38bdf8, #0ea5e9)',
+    svgPath: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/><path d="M12 7v10"/><path d="M9 10c1-1 2-1.5 3-1.5s2 .5 3 1.5"/>',
+  },
+  road_damage: {
+    color: '#dc2626',
+    bgGradient: 'linear-gradient(135deg, #f87171, #dc2626)',
+    svgPath: '<path d="M3 20h18"/><path d="m7 20 3-8 5 8"/><path d="M4 6l4-2 6 4 5-2"/><path d="M8 11h8"/>',
+  },
   other: {
     color: '#7c3aed', // Purple
     bgGradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',

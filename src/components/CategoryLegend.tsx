@@ -5,7 +5,9 @@ import {
   Droplets, 
   Trash2, 
   HelpCircle,
-  Layers
+  Layers,
+  Waves,
+  Route
 } from 'lucide-react';
 import type { ComplaintCategory } from '../types';
 
@@ -45,6 +47,18 @@ const LEGEND_ITEMS: {
     label: 'Garbage & Waste',
     color: 'bg-emerald-500 text-emerald-800 bg-emerald-50 border-emerald-200',
     icon: <Trash2 className="w-3.5 h-3.5 text-emerald-600" />,
+  },
+  {
+    category: 'water_supply',
+    label: 'Water Supply',
+    color: 'bg-cyan-500 text-cyan-800 bg-cyan-50 border-cyan-200',
+    icon: <Waves className="w-3.5 h-3.5 text-cyan-600" />,
+  },
+  {
+    category: 'road_damage',
+    label: 'Road Damage',
+    color: 'bg-red-500 text-red-800 bg-red-50 border-red-200',
+    icon: <Route className="w-3.5 h-3.5 text-red-600" />,
   },
   {
     category: 'other',

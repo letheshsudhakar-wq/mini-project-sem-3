@@ -5,8 +5,22 @@ export const COMPLAINT_CATEGORIES: { value: ComplaintCategory; label: string; de
   { value: 'streetlight', label: 'Streetlight Issue', description: 'Non-functional, broken, or flickering public street lighting.' },
   { value: 'drainage', label: 'Drainage & Sewage', description: 'Clogged storm drains, overflowing sewers, or waterlogging.' },
   { value: 'garbage', label: 'Garbage & Waste', description: 'Uncollected waste, overflowing community bins, or illegal dumping.' },
+  { value: 'water_supply', label: 'Water Supply', description: 'Low pressure, contamination, or intermittent public water supply issues.' },
+  { value: 'road_damage', label: 'Road Damage', description: 'Uneven pavement, road cracks, or damaged carriageway surfaces.' },
   { value: 'other', label: 'Other Civic Grievance', description: 'Other public utility or municipal maintenance concerns.' },
 ];
+
+export const GOVERNMENT_DEPARTMENTS = [
+  'Public Works',
+  'Electrical Services',
+  'Drainage',
+  'Sanitation',
+  'Water Supply',
+  'Municipal Corporation',
+  'General Services',
+] as const;
+
+export const SIMILAR_REPORT_RADIUS_METERS = 250;
 
 export const COMPLAINT_STATUSES: { value: ComplaintStatus; label: string; badgeColor: string }[] = [
   { value: 'reported', label: 'Reported', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' },

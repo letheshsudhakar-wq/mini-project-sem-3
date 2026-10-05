@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   UserPlus, 
@@ -44,7 +44,6 @@ const GoogleIcon: React.FC = () => (
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
   const { signUp, signInWithGoogle, isDemoMode } = useAuth();
-  const { success, error: toastError } = useToast();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -56,6 +55,17 @@ export const SignupPage: React.FC = () => {
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState<{ emailVerificationNeeded: boolean; email: string } | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    if (role === 'admin' || isAdmin) {
+      navigate('/government', { replace: true });
+      return;
+    }
+
+    navigate('/complaints', { replace: true });
+  }, [isAuthenticated, isAdmin, navigate, role]);
 
   const handleGoogleSignUp = async () => {
     nativeService.triggerHaptic('light');

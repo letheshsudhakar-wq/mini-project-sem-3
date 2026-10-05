@@ -8,9 +8,11 @@ export type Json =
 
 export type UserRole = 'citizen' | 'admin';
 
-export type ComplaintCategory = 'pothole' | 'streetlight' | 'drainage' | 'garbage' | 'other';
+export type ComplaintCategory = 'pothole' | 'streetlight' | 'drainage' | 'garbage' | 'water_supply' | 'road_damage' | 'other';
 
 export type ComplaintStatus = 'reported' | 'in_progress' | 'resolved' | 'rejected';
+export type ComplaintPriority = 'low' | 'normal' | 'high' | 'critical';
+export type ResolutionConfirmationStatus = 'pending' | 'confirmed' | 'disputed';
 
 export interface Profile {
   id: string;
@@ -18,6 +20,8 @@ export interface Profile {
   email: string | null;
   phone: string | null;
   role: UserRole;
+  department?: string | null;
+  ward?: string | null;
   created_at: string;
 }
 
@@ -28,6 +32,14 @@ export interface Complaint {
   description: string;
   photo_url: string | null;
   resolution_photo_url: string | null;
+  resolved_at?: string | null;
+  resolution_department?: string | null;
+  resolution_officer_id?: string | null;
+  resolution_officer_name?: string | null;
+  resolution_note?: string | null;
+  resolution_confirmation_status?: ResolutionConfirmationStatus | null;
+  resolution_feedback?: string | null;
+  resolution_feedback_at?: string | null;
   latitude: number;
   longitude: number;
   address: string | null;
@@ -35,6 +47,12 @@ export interface Complaint {
   upvote_count: number;
   created_at: string;
   updated_at: string;
+  department?: string | null;
+  assigned_officer_id?: string | null;
+  assigned_officer?: Profile | null;
+  priority?: ComplaintPriority;
+  sla_deadline?: string | null;
+  demo_status_label?: string | null;
   // Expanded relations
   profile?: Profile;
   has_upvoted?: boolean;
@@ -69,6 +87,10 @@ export interface AdminDashboardStats {
   in_progress: number;
   resolved: number;
   rejected: number;
+  critical: number;
+  overdue: number;
+  average_resolution_hours: number | null;
+  department_counts: Record<string, number>;
 }
 
 export interface Database {
@@ -117,6 +139,14 @@ export interface Database {
           description: string;
           photo_url: string | null;
           resolution_photo_url: string | null;
+          resolved_at: string | null;
+          resolution_department: string | null;
+          resolution_officer_id: string | null;
+          resolution_officer_name: string | null;
+          resolution_note: string | null;
+          resolution_confirmation_status: ResolutionConfirmationStatus | null;
+          resolution_feedback: string | null;
+          resolution_feedback_at: string | null;
           latitude: number;
           longitude: number;
           address: string | null;
@@ -124,6 +154,10 @@ export interface Database {
           upvote_count: number;
           created_at: string;
           updated_at: string;
+          department: string | null;
+          assigned_officer_id: string | null;
+          priority: ComplaintPriority;
+          sla_deadline: string | null;
         };
         Insert: {
           id?: string;
@@ -132,6 +166,14 @@ export interface Database {
           description: string;
           photo_url?: string | null;
           resolution_photo_url?: string | null;
+          resolved_at?: string | null;
+          resolution_department?: string | null;
+          resolution_officer_id?: string | null;
+          resolution_officer_name?: string | null;
+          resolution_note?: string | null;
+          resolution_confirmation_status?: ResolutionConfirmationStatus | null;
+          resolution_feedback?: string | null;
+          resolution_feedback_at?: string | null;
           latitude: number;
           longitude: number;
           address?: string | null;
@@ -139,6 +181,10 @@ export interface Database {
           upvote_count?: number;
           created_at?: string;
           updated_at?: string;
+          department?: string | null;
+          assigned_officer_id?: string | null;
+          priority?: ComplaintPriority;
+          sla_deadline?: string | null;
         };
         Update: {
           id?: string;
@@ -147,6 +193,14 @@ export interface Database {
           description?: string;
           photo_url?: string | null;
           resolution_photo_url?: string | null;
+          resolved_at?: string | null;
+          resolution_department?: string | null;
+          resolution_officer_id?: string | null;
+          resolution_officer_name?: string | null;
+          resolution_note?: string | null;
+          resolution_confirmation_status?: ResolutionConfirmationStatus | null;
+          resolution_feedback?: string | null;
+          resolution_feedback_at?: string | null;
           latitude?: number;
           longitude?: number;
           address?: string | null;
@@ -154,11 +208,29 @@ export interface Database {
           upvote_count?: number;
           created_at?: string;
           updated_at?: string;
+          department?: string | null;
+          assigned_officer_id?: string | null;
+          priority?: ComplaintPriority;
+          sla_deadline?: string | null;
         };
         Relationships: [
           {
             foreignKeyName: "complaints_user_id_fkey";
             columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_assigned_officer_id_fkey";
+            columns: ["assigned_officer_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_resolution_officer_id_fkey";
+            columns: ["resolution_officer_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -310,6 +382,24 @@ export interface Database {
           p_new_status: string;
           p_note?: string | null;
           p_photo_url?: string | null;
+        };
+        Returns: Complaint;
+      };
+      admin_update_complaint_status_with_resolution: {
+        Args: {
+          p_complaint_id: string;
+          p_new_status: string;
+          p_note?: string | null;
+          p_photo_url?: string | null;
+          p_resolution_department?: string | null;
+        };
+        Returns: Complaint;
+      };
+      citizen_submit_resolution_feedback: {
+        Args: {
+          p_complaint_id: string;
+          p_resolved: boolean;
+          p_feedback?: string | null;
         };
         Returns: Complaint;
       };

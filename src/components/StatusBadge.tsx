@@ -5,12 +5,14 @@ interface StatusBadgeProps {
   status: ComplaintStatus;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  labelOverride?: string | null;
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({
   status,
   size = 'md',
   className = '',
+  labelOverride,
 }) => {
   const getStatusConfig = (s: ComplaintStatus) => {
     switch (s) {
@@ -53,6 +55,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   };
 
   const config = getStatusConfig(status);
+  const label = labelOverride || config.label;
 
   const sizeClasses = {
     sm: 'text-[10px] px-2 py-0.5 gap-1',
@@ -63,10 +66,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   return (
     <span
       className={`inline-flex items-center rounded-full font-semibold border ${config.badgeColor} ${sizeClasses[size]} ${className}`}
-      aria-label={`Status: ${config.label}`}
+      aria-label={`Status: ${label}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${config.dotColor} shrink-0`} />
-      <span className="capitalize">{config.label}</span>
+      <span className="capitalize">{label}</span>
     </span>
   );
 };

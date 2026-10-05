@@ -21,11 +21,10 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/government/login" state={{ from: location }} replace />;
   }
 
   if (!isAdmin) {
-    // Citizen attempting to access /admin -> redirect to /complaints
     return <Navigate to="/complaints" replace />;
   }
 

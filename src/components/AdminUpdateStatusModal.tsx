@@ -14,6 +14,7 @@ import { storageService } from '../services/storage';
 import { complaintsService } from '../services/complaints';
 import { nativeService } from '../services/nativeService';
 import { useAuth } from '../hooks/useAuth';
+import { GOVERNMENT_DEPARTMENTS } from '../utils/constants';
 import type { Complaint, ComplaintStatus } from '../types';
 
 interface AdminUpdateStatusModalProps {
@@ -29,10 +30,11 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
   onClose,
   onUpdated,
 }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [newStatus, setNewStatus] = useState<ComplaintStatus>(complaint.status);
   const [note, setNote] = useState<string>('');
+  const [resolutionDepartment, setResolutionDepartment] = useState('');
   const [resolutionPhotoFile, setResolutionPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
@@ -47,6 +49,7 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
     if (isOpen) {
       setNewStatus(complaint.status);
       setNote('');
+      setResolutionDepartment(profile?.department || complaint.department || '');
       setResolutionPhotoFile(null);
       setPhotoPreview(null);
       setStep('form');
@@ -56,7 +59,7 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen, complaint]);
+  }, [isOpen, complaint, profile?.department]);
 
   const handleNativeCamera = async () => {
     nativeService.triggerHaptic('light');
@@ -117,6 +120,11 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
       return;
     }
 
+    if (newStatus === 'resolved' && !resolutionDepartment.trim()) {
+      setErrorMsg('Please select the department that completed this resolution.');
+      return;
+    }
+
     setStep('confirm');
   };
 
@@ -150,6 +158,7 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
         status: newStatus,
         note: note.trim() || undefined,
         photoUrl: resolutionPhotoUrl,
+        resolutionDepartment: resolutionDepartment.trim() || null,
         updatedBy: user?.id || 'demo-admin-id',
       });
 
@@ -236,6 +245,24 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
                 ))}
               </div>
             </div>
+
+            {newStatus === 'resolved' && (
+              <label className="block space-y-1.5">
+                <span className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                  Resolving Department <span className="text-rose-500">*</span>
+                </span>
+                <select
+                  value={resolutionDepartment}
+                  onChange={(event) => setResolutionDepartment(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  <option value="">Select department</option>
+                  {Array.from(new Set([...GOVERNMENT_DEPARTMENTS, ...(complaint.department ? [complaint.department] : [])])).map((department) => (
+                    <option key={department} value={department}>{department}</option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             {/* Official Update Note */}
             <div className="space-y-1.5">

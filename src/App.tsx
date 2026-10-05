@@ -26,9 +26,10 @@ export const App: React.FC = () => {
             {/* Public Access Routes */}
             <Route index element={<HomePage />} />
             <Route path="login" element={<LoginPage />} />
+            <Route path="government/login" element={<LoginPage />} />
             <Route path="signup" element={<SignupPage />} />
 
-            {/* Authenticated Routes (Citizens & Admins) */}
+            {/* Citizen-only routes */}
             <Route element={<ProtectedRoute />}>
               <Route path="complaints" element={<ComplaintsPage />} />
               <Route path="complaints/:id" element={<ComplaintDetailPage />} />
@@ -38,6 +39,7 @@ export const App: React.FC = () => {
 
             {/* Admin Only Routes */}
             <Route element={<AdminRoute />}>
+              <Route path="government" element={<AdminPage />} />
               <Route path="admin" element={<AdminPage />} />
             </Route>
 

@@ -104,10 +104,13 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
         {updates.map((update, idx) => {
           const isResolved = update.status === 'resolved';
           const isRejected = update.status === 'rejected';
+          const isCitizenFeedback = update.updater_profile?.role === 'citizen';
 
           const iconColor = isResolved
             ? 'bg-emerald-100 border-emerald-500 text-emerald-700'
             : isRejected
+            ? 'bg-rose-100 border-rose-500 text-rose-700'
+            : isCitizenFeedback
             ? 'bg-rose-100 border-rose-500 text-rose-700'
             : 'bg-blue-100 border-blue-500 text-blue-700';
 
@@ -129,7 +132,7 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
                   <div className="flex items-center gap-2">
                     <StatusBadge status={update.status} size="sm" />
                     <span className="text-xs font-bold text-slate-800">
-                      Official Status Update
+                      {isCitizenFeedback ? 'Citizen Resolution Feedback' : 'Official Status Update'}
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-400 font-medium">

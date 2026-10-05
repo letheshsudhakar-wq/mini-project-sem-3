@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, getSupabaseOAuthRedirectUrl } from '../lib/supabase';
 import type { Profile, UserRole } from '../types';
 import { MockCivicStore, DEMO_PROFILES } from '../utils/mockData';
+import { setDemoGovernmentSession } from '../utils/demoGovernmentAccess';
 
 interface SignUpParams {
   name: string;
@@ -22,6 +23,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isConfigured: boolean;
   isDemoMode: boolean;
+  isDemoGovernmentSession: boolean;
   signIn: (email: string, password: string) => Promise<{ user: User | null; profile: Profile | null; error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signInAsDemo: (role: 'citizen' | 'admin') => Promise<{ user: User | null; profile: Profile | null; error: Error | null }>;
@@ -99,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || 'Citizen',
           email: currentUser.email || '',
           phone: currentUser.user_metadata?.phone || '',
-          role: (currentUser.user_metadata?.role as UserRole) || (currentUser.email?.includes('admin') ? 'admin' : 'citizen'),
+          role: 'citizen',
           created_at: currentUser.created_at || new Date().toISOString(),
         };
         setProfile(fallbackProf);
@@ -181,11 +183,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Demo 1-click Sign In
   const signInAsDemo = async (demoRole: 'citizen' | 'admin') => {
     setLoading(true);
-    const demoProfile = demoRole === 'admin' ? DEMO_PROFILES['demo-admin-id'] : DEMO_PROFILES['demo-citizen-id'];
-    
-    // Save to local profile registry
+    const demoProfile = demoRole === 'admin' ? DEMO_PROFILES['demo-government-id'] : DEMO_PROFILES['demo-citizen-id'];
+
     MockCivicStore.saveProfile(demoProfile);
     localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(demoProfile));
+    setDemoGovernmentSession(demoRole === 'admin');
 
     const mockUser = createMockSupabaseUser(demoProfile);
     setUser(mockUser);
@@ -257,29 +259,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       if (!isSupabaseConfigured) {
-        // Fallback for offline demo mode
-        const googleProfile: Profile = {
-          id: `google-user-${Date.now()}`,
-          name: 'Google Citizen',
-          email: 'citizen.google@civicfix.org',
-          phone: '',
-          role: 'citizen',
-          created_at: new Date().toISOString(),
-        };
-        MockCivicStore.saveProfile(googleProfile);
-        localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(googleProfile));
-
-        const mockUser = createMockSupabaseUser(googleProfile);
-        setUser(mockUser);
-        setProfile(googleProfile);
+        const configError = new Error(
+          'Google sign-in could not be completed. Authentication configuration is incomplete. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file and configure your Supabase Google provider.'
+        );
         setLoading(false);
-        return { error: null };
+        return { error: configError };
       }
 
+      const redirectUrl = getSupabaseOAuthRedirectUrl();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/complaints`,
+          redirectTo: redirectUrl,
         },
       });
 
@@ -288,6 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error };
       }
 
+      setLoading(false);
       return { error: null };
     } catch (err: any) {
       setLoading(false);
@@ -360,6 +352,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await supabase.auth.signOut().catch(() => null);
       }
       localStorage.removeItem(LOCAL_SESSION_KEY);
+      setDemoGovernmentSession(false);
       setUser(null);
       setSession(null);
       setProfile(null);
@@ -377,9 +370,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return await fetchProfile(user.id);
   };
 
-  const role: UserRole | null = profile?.role ?? (user?.user_metadata?.role as UserRole) ?? (user?.email?.includes('admin') ? 'admin' : (user ? 'citizen' : null));
+  const role: UserRole | null = profile?.role ?? (user ? 'citizen' : null);
   const isAuthenticated = Boolean(user);
   const isAdmin = role === 'admin';
+  const isDemoGovernmentSession = Boolean(profile && profile.role === 'admin' && profile.id === 'demo-government-id');
 
   return (
     <AuthContext.Provider
@@ -394,6 +388,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin,
         isConfigured: isSupabaseConfigured,
         isDemoMode: !isSupabaseConfigured,
+        isDemoGovernmentSession,
         signIn,
         signInWithGoogle,
         signInAsDemo,

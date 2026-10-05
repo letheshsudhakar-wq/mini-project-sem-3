@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LogIn, 
@@ -12,8 +12,7 @@ import {
   EyeOff,
   Check,
   LogOut,
-  Sparkles,
-  User
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { formatAuthError } from '../utils/authErrors';
@@ -44,19 +43,19 @@ const GoogleIcon: React.FC = () => (
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { success, error: toastError } = useToast();
   const { 
     user, 
     profile, 
     role, 
     signIn, 
+    signInAsDemo,
     signInWithGoogle,
     signInAsDemo,
     signOut, 
     isAuthenticated, 
     isAdmin, 
     isConfigured, 
-    isDemoMode 
+    isDemoMode,
   } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -73,10 +72,28 @@ export const LoginPage: React.FC = () => {
       return from;
     }
     if (userRole === 'admin' || (!userRole && isAdmin)) {
-      return '/admin';
+      return '/government';
     }
     return '/complaints';
   };
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    if (isGovernmentLogin) {
+      if (isAdmin || role === 'admin') {
+        navigate('/government', { replace: true });
+      }
+      return;
+    }
+
+    if (role === 'admin' || isAdmin) {
+      navigate('/government', { replace: true });
+      return;
+    }
+
+    navigate('/complaints', { replace: true });
+  }, [isAuthenticated, isAdmin, isGovernmentLogin, navigate, role]);
 
   const handleGoogleSignIn = async () => {
     nativeService.triggerHaptic('light');
@@ -93,28 +110,11 @@ export const LoginPage: React.FC = () => {
       }
 
       if (isDemoMode) {
-        success('Signed in successfully');
         navigate('/complaints', { replace: true });
       }
     } catch (err) {
       setErrorMessage(formatAuthError(err));
       setIsGoogleSubmitting(false);
-    }
-  };
-
-  const handleQuickDemoLogin = async (targetRole: 'citizen' | 'admin') => {
-    nativeService.triggerHaptic('medium');
-    setIsSubmitting(true);
-    try {
-      const { error } = await signInAsDemo(targetRole);
-      if (error) {
-        setErrorMessage(error.message);
-      } else {
-        success(`Signed in as Demo ${targetRole === 'admin' ? 'Admin' : 'Citizen'}`);
-        navigate(targetRole === 'admin' ? '/admin' : '/complaints', { replace: true });
-      }
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -169,8 +169,6 @@ export const LoginPage: React.FC = () => {
         return;
       }
 
-      nativeService.triggerHaptic('success');
-      success('Signed in successfully!');
       const assignedRole = userProfile?.role || (trimmedEmail.includes('admin') ? 'admin' : 'citizen');
       const dest = getDestinationPath(assignedRole);
       navigate(dest, { replace: true });
@@ -189,10 +187,22 @@ export const LoginPage: React.FC = () => {
           <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-400/30 text-blue-400 mx-auto flex items-center justify-center shadow-inner">
             <LogIn className="w-6 h-6 text-blue-300" />
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">Sign In to CivicFix</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Sign In to CivicFix</h1>
           <p className="text-xs sm:text-sm text-slate-300">
-            Access your civic grievance reports, upvotes, and status updates
+            {isGovernmentLogin
+              ? 'Access the municipal complaint operations dashboard'
+              : 'Access your civic grievance reports, upvotes, and status updates'}
           </p>
+
+          {isGovernmentLogin && (
+            <div className="rounded-xl border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-left text-[11px] text-amber-100">
+              <div className="mb-1 flex items-center gap-2 font-bold uppercase tracking-wide text-amber-200">
+                <ShieldAlert className="h-3.5 w-3.5" />
+                Demo Government Access
+              </div>
+              <div>For presentation/testing only.</div>
+            </div>
+          )}
 
           {/* Mode Pill */}
           <div className="pt-2 flex justify-center">
@@ -211,40 +221,8 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Form Body */}
-        <div className="p-5 sm:p-8 space-y-5">
-          {/* 1-Tap Quick Demo Switcher */}
-          <div className="space-y-1.5 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
-            <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              <span className="flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                Instant Demo Access
-              </span>
-              <span className="text-[10px] text-slate-400 lowercase">1-tap sign in</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('citizen')}
-                disabled={isSubmitting}
-                className="py-2 px-3 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-xs font-bold text-slate-700 transition flex items-center justify-center gap-1.5 active:scale-95 shadow-2xs cursor-pointer"
-              >
-                <User className="w-3.5 h-3.5 text-blue-600" />
-                <span>Demo Citizen</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('admin')}
-                disabled={isSubmitting}
-                className="py-2 px-3 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs font-bold text-slate-700 transition flex items-center justify-center gap-1.5 active:scale-95 shadow-2xs cursor-pointer"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Demo Admin</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Active Session Card */}
+        <div className="p-6 sm:p-8 space-y-6">
+          {/* Active Session Card (if user is currently signed in) */}
           {isAuthenticated && user && (
             <div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
@@ -257,7 +235,7 @@ export const LoginPage: React.FC = () => {
                       {profile?.name || user.email}
                     </p>
                     <p className="text-[10px] uppercase font-bold text-blue-700 tracking-wider">
-                      Signed In ({role || (isAdmin ? 'Admin' : 'Citizen')})
+                      Currently Signed In ({role || (isAdmin ? 'Admin' : 'Citizen')})
                     </p>
                   </div>
                 </div>
@@ -285,7 +263,7 @@ export const LoginPage: React.FC = () => {
                   onClick={() => navigate(getDestinationPath(role), { replace: true })}
                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
                 >
-                  <span>Go to {isAdmin ? 'Admin Console' : 'Complaints'}</span>
+                  <span>Go to {isAdmin ? 'Government Dashboard' : 'Complaints'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -303,7 +281,7 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Google Sign In */}
+          {/* Sign In with Google Button */}
           <div>
             <button
               type="button"
@@ -319,7 +297,7 @@ export const LoginPage: React.FC = () => {
               )}
               <span>Continue with Google</span>
             </button>
-          </div>
+          </div>}
 
           {/* Divider */}
           <div className="relative">
@@ -417,6 +395,14 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
+
+          {/* Role Info Box */}
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>
+              Citizens are routed to <strong>Complaints</strong> and Admins are routed to <strong>Admin Console</strong> automatically.
+            </span>
+          </div>
 
           {/* Footer Link to Signup */}
           <div className="pt-2 border-t border-slate-100 text-center text-xs text-slate-500">

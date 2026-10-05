@@ -1,4 +1,5 @@
 import type { Complaint, ComplaintUpdate, Profile, AdminDashboardStats, Upvote } from '../types';
+import { DEMO_GOVERNMENT_PROFILE } from './demoGovernmentData';
 
 export const DEMO_PROFILES: Record<string, Profile> = {
   'demo-citizen-id': {
@@ -17,6 +18,7 @@ export const DEMO_PROFILES: Record<string, Profile> = {
     role: 'admin',
     created_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
   },
+  'demo-government-id': DEMO_GOVERNMENT_PROFILE,
 };
 
 export const INITIAL_MOCK_COMPLAINTS: Complaint[] = [
@@ -34,6 +36,11 @@ export const INITIAL_MOCK_COMPLAINTS: Complaint[] = [
     upvote_count: 14,
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+    department: 'Public Works',
+    assigned_officer_id: 'demo-admin-id',
+    priority: 'critical',
+    sla_deadline: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+    assigned_officer: DEMO_PROFILES['demo-admin-id'],
     profile: DEMO_PROFILES['demo-citizen-id'],
     has_upvoted: false,
   },
@@ -51,6 +58,10 @@ export const INITIAL_MOCK_COMPLAINTS: Complaint[] = [
     upvote_count: 8,
     created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+    department: 'Electrical Services',
+    assigned_officer_id: null,
+    priority: 'high',
+    sla_deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
     profile: DEMO_PROFILES['demo-citizen-id'],
     has_upvoted: false,
   },
@@ -68,6 +79,11 @@ export const INITIAL_MOCK_COMPLAINTS: Complaint[] = [
     upvote_count: 23,
     created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    department: 'Sanitation',
+    assigned_officer_id: 'demo-admin-id',
+    priority: 'normal',
+    sla_deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    assigned_officer: DEMO_PROFILES['demo-admin-id'],
     profile: DEMO_PROFILES['demo-citizen-id'],
     has_upvoted: true,
   },
@@ -85,6 +101,10 @@ export const INITIAL_MOCK_COMPLAINTS: Complaint[] = [
     upvote_count: 5,
     created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    department: 'Drainage',
+    assigned_officer_id: null,
+    priority: 'high',
+    sla_deadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     profile: DEMO_PROFILES['demo-citizen-id'],
     has_upvoted: false,
   },
@@ -194,13 +214,29 @@ export class MockCivicStore {
       in_progress: 0,
       resolved: 0,
       rejected: 0,
+      critical: 0,
+      overdue: 0,
+      average_resolution_hours: null,
+      department_counts: {},
     };
+    const resolutionHours: number[] = [];
     list.forEach((c) => {
       if (c.status === 'reported') stats.reported++;
       else if (c.status === 'in_progress') stats.in_progress++;
       else if (c.status === 'resolved') stats.resolved++;
       else if (c.status === 'rejected') stats.rejected++;
+      if (c.priority === 'critical') stats.critical++;
+      if (c.sla_deadline && new Date(c.sla_deadline).getTime() < Date.now() && !['resolved', 'rejected'].includes(c.status)) {
+        stats.overdue++;
+      }
+      if (c.department) stats.department_counts[c.department] = (stats.department_counts[c.department] || 0) + 1;
+      if (c.status === 'resolved') {
+        resolutionHours.push((new Date(c.updated_at).getTime() - new Date(c.created_at).getTime()) / 3600000);
+      }
     });
+    if (resolutionHours.length) {
+      stats.average_resolution_hours = resolutionHours.reduce((total, hours) => total + hours, 0) / resolutionHours.length;
+    }
     return stats;
   }
 }

@@ -24,6 +24,7 @@ import { UpvoteButton } from '../components/UpvoteButton';
 import { ImageModal } from '../components/ImageModal';
 import { EditComplaintModal } from '../components/EditComplaintModal';
 import { DeleteConfirmationModal } from '../components/DeleteConfirmationModal';
+import { CivicPriorityScore } from '../components/CivicPriorityScore';
 import { COMPLAINT_CATEGORIES } from '../utils/constants';
 import { useToast } from '../contexts/ToastContext';
 import { nativeService } from '../services/nativeService';
@@ -37,6 +38,7 @@ export const ComplaintDetailPage: React.FC = () => {
 
   const [complaint, setComplaint] = useState<Complaint | null>(null);
   const [updates, setUpdates] = useState<ComplaintUpdate[]>([]);
+  const [similarReportCount, setSimilarReportCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -46,6 +48,9 @@ export const ComplaintDetailPage: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [resolutionFeedback, setResolutionFeedback] = useState('');
+  const [isSubmittingResolutionFeedback, setIsSubmittingResolutionFeedback] = useState(false);
+  const [resolutionFeedbackError, setResolutionFeedbackError] = useState<string | null>(null);
 
   const fetchComplaintDetails = async () => {
     if (!id) return;
@@ -61,6 +66,9 @@ export const ComplaintDetailPage: React.FC = () => {
       }
 
       setComplaint(comp);
+
+      const { data: similarCounts } = await complaintsService.getSimilarComplaintCounts([comp]);
+      setSimilarReportCount(similarCounts?.[comp.id] ?? null);
 
       // Fetch audit timeline updates
       const { data: updateList } = await complaintsService.getComplaintUpdates(id);
@@ -112,6 +120,26 @@ export const ComplaintDetailPage: React.FC = () => {
     success('Complaint updated successfully.');
   };
 
+  const handleResolutionFeedback = async (resolved: boolean) => {
+    if (!complaint || !user) return;
+    setIsSubmittingResolutionFeedback(true);
+    setResolutionFeedbackError(null);
+    const { data, error } = await complaintsService.submitResolutionFeedback(
+      complaint.id,
+      user.id,
+      resolved,
+      resolutionFeedback,
+    );
+    setIsSubmittingResolutionFeedback(false);
+    if (error || !data) {
+      setResolutionFeedbackError(error?.message || 'Unable to submit your resolution feedback.');
+      return;
+    }
+    setComplaint(data);
+    setResolutionFeedback('');
+    await fetchComplaintDetails();
+  };
+
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto py-12 text-center space-y-3">
@@ -143,18 +171,24 @@ export const ComplaintDetailPage: React.FC = () => {
 
   const categoryInfo = COMPLAINT_CATEGORIES.find((c) => c.value === complaint.category);
   const isOwner = user?.id === complaint.user_id;
-  const isEditable = isOwner && complaint.status === 'reported';
+  const isEditable = isOwner && complaint.status === 'reported' && complaint.resolution_confirmation_status !== 'disputed';
 
   // Status banner configuration
   const getStatusBannerConfig = () => {
     switch (complaint.status) {
       case 'reported':
         return {
-          title: 'Reported & Pending Review',
-          description: 'Your grievance report has been registered and is pending municipal review and assignment.',
-          bg: 'bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-amber-300',
-          textColor: 'text-amber-900',
-          icon: <Clock className="w-5 h-5 text-amber-600" />,
+          title: complaint.resolution_confirmation_status === 'disputed' ? 'Resolution disputed' : 'Reported & Pending Review',
+          description: complaint.resolution_confirmation_status === 'disputed'
+            ? 'You reported that the issue still exists. The government team has been notified and the complaint is reopened.'
+            : 'Your grievance report has been registered and is pending municipal review and assignment.',
+          bg: complaint.resolution_confirmation_status === 'disputed'
+            ? 'bg-gradient-to-r from-rose-500/10 via-rose-500/5 to-transparent border-rose-300'
+            : 'bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-amber-300',
+          textColor: complaint.resolution_confirmation_status === 'disputed' ? 'text-rose-900' : 'text-amber-900',
+          icon: complaint.resolution_confirmation_status === 'disputed'
+            ? <AlertCircle className="w-5 h-5 text-rose-600" />
+            : <Clock className="w-5 h-5 text-amber-600" />,
         };
       case 'in_progress':
         return {
@@ -166,8 +200,8 @@ export const ComplaintDetailPage: React.FC = () => {
         };
       case 'resolved':
         return {
-          title: 'Grievance Resolved',
-          description: 'This civic issue has been officially resolved and verified by municipal administrators.',
+          title: 'Resolution Marked Complete',
+          description: 'A municipal official marked this issue as resolved. Review the resolution record and confirm whether it is fixed.',
           bg: 'bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-300',
           textColor: 'text-emerald-900',
           icon: <CheckCircle2 className="w-5 h-5 text-emerald-600" />,
@@ -229,7 +263,7 @@ export const ComplaintDetailPage: React.FC = () => {
             ) : (
               <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-100 px-2.5 py-1 rounded-xl">
                 <Lock className="w-3 h-3" />
-                Locked
+                Locked (Under Processing)
               </span>
             )}
           </div>
@@ -247,7 +281,11 @@ export const ComplaintDetailPage: React.FC = () => {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Current Status
               </span>
-              <StatusBadge status={complaint.status} size="sm" />
+              <StatusBadge
+                status={complaint.status}
+                size="sm"
+                labelOverride={complaint.resolution_confirmation_status === 'disputed' ? 'Resolution disputed' : undefined}
+              />
             </div>
             <h2 className={`text-base sm:text-lg font-extrabold ${statusBanner.textColor}`}>
               {statusBanner.title}
@@ -270,6 +308,85 @@ export const ComplaintDetailPage: React.FC = () => {
           />
         </div>
       </div>
+
+      {complaint.status === 'resolved' && isOwner && (
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 space-y-4" aria-live="polite">
+          <div>
+            <h2 className="text-sm font-bold text-emerald-950">Your complaint has been marked as resolved.</h2>
+            <p className="mt-1 text-xs text-emerald-900/80">
+              {complaint.resolution_confirmation_status === 'confirmed'
+                ? 'You confirmed that the issue is resolved.'
+                : complaint.resolution_confirmation_status === 'disputed'
+                  ? 'You reported that the issue still exists. It has been reopened for government review.'
+                  : 'Please confirm whether the issue has actually been fixed.'}
+            </p>
+          </div>
+          {complaint.resolution_confirmation_status === 'pending' || !complaint.resolution_confirmation_status ? (
+            isOwner && (
+              <div className="space-y-3">
+                <label className="block text-xs font-semibold text-slate-700" htmlFor="resolution-feedback">
+                  Feedback for the government team <span className="font-normal text-slate-500">(optional)</span>
+                </label>
+                <textarea
+                  id="resolution-feedback"
+                  rows={2}
+                  maxLength={1000}
+                  value={resolutionFeedback}
+                  onChange={(event) => setResolutionFeedback(event.target.value)}
+                  placeholder="Add details if the issue still exists"
+                  className="w-full rounded-xl border border-emerald-200 bg-white p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+                {resolutionFeedbackError && <p role="alert" className="text-xs text-rose-700">{resolutionFeedbackError}</p>}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={isSubmittingResolutionFeedback}
+                    onClick={() => handleResolutionFeedback(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="h-4 w-4" /> Issue is resolved
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmittingResolutionFeedback}
+                    onClick={() => handleResolutionFeedback(false)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-bold text-rose-800 hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    <AlertCircle className="h-4 w-4" /> Issue still exists
+                  </button>
+                </div>
+              </div>
+            )
+          ) : (
+            <p className="text-xs font-semibold text-emerald-900">
+              {complaint.resolution_confirmation_status === 'confirmed' ? 'Confirmation recorded.' : 'Your dispute has been sent to the government team.'}
+            </p>
+          )}
+        </section>
+      )}
+
+      {(complaint.resolved_at || complaint.resolution_photo_url || complaint.resolution_note) && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-bold text-slate-900">Government resolution record</h2>
+            <span className="text-[11px] text-slate-500">
+              {complaint.resolved_at ? new Date(complaint.resolved_at).toLocaleString() : ''}
+            </span>
+          </div>
+          <div className="grid gap-2 text-xs sm:grid-cols-2">
+            <p><span className="font-semibold text-slate-500">Department:</span> {complaint.resolution_department || 'Not recorded'}</p>
+            <p><span className="font-semibold text-slate-500">Officer:</span> {complaint.resolution_officer_name || 'Not recorded'}</p>
+          </div>
+          {complaint.resolution_note && <p className="text-xs leading-relaxed text-slate-700">{complaint.resolution_note}</p>}
+          {complaint.resolution_photo_url && (
+            <button type="button" onClick={() => setSelectedPhoto(complaint.resolution_photo_url)} className="block h-40 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100 sm:w-72">
+              <img src={complaint.resolution_photo_url} alt="Government resolution evidence" className="h-full w-full object-cover" />
+            </button>
+          )}
+        </section>
+      )}
+
+      <CivicPriorityScore complaint={complaint} similarReportCount={similarReportCount} />
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
