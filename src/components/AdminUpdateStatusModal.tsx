@@ -9,6 +9,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
+import { LiveCameraModal } from './LiveCameraModal';
 import { compressImage } from '../utils/imageCompressor';
 import { storageService } from '../services/storage';
 import { complaintsService } from '../services/complaints';
@@ -42,6 +43,7 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
   const [step, setStep] = useState<'form' | 'confirm'>('form');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -71,8 +73,18 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
         setErrorMsg(null);
         return;
       }
+      if (result.error && result.error !== 'Photo selection cancelled') {
+        setIsCameraModalOpen(true);
+      }
+      return;
     }
-    fileInputRef.current?.click();
+    setIsCameraModalOpen(true);
+  };
+
+  const handleLiveCameraCapture = (file: File, dataUrl: string) => {
+    setResolutionPhotoFile(file);
+    setPhotoPreview(dataUrl);
+    setErrorMsg(null);
   };
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -408,6 +420,14 @@ export const AdminUpdateStatusModal: React.FC<AdminUpdateStatusModalProps> = ({
           </div>
         )}
       </div>
+
+      <LiveCameraModal
+        isOpen={isCameraModalOpen}
+        onClose={() => setIsCameraModalOpen(false)}
+        onCapture={handleLiveCameraCapture}
+        onBrowseFiles={() => fileInputRef.current?.click()}
+        title="Capture Resolution Proof"
+      />
     </div>
   );
 };

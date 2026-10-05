@@ -25,6 +25,7 @@ import { reverseGeocode } from '../services/geocoding';
 import { compressImage } from '../utils/imageCompressor';
 import { COMPLAINT_CATEGORIES } from '../utils/constants';
 import { LocationPickerMap } from '../components/LocationPickerMap';
+import { LiveCameraModal } from '../components/LiveCameraModal';
 import { nativeService } from '../services/nativeService';
 import { aiService, type AIAssessmentResult } from '../services/aiService';
 import { useToast } from '../contexts/ToastContext';
@@ -49,6 +50,7 @@ export const ReportPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
 
   // AI Assistance States
   const [aiAssessment, setAiAssessment] = useState<AIAssessmentResult | null>(null);
@@ -175,7 +177,7 @@ export const ReportPage: React.FC = () => {
     }
   };
 
-  // Handle Photo selection (via Native Camera or File Picker)
+  // Handle Photo selection (via Native Camera or Live Web Camera Modal)
   const handleNativeCamera = async () => {
     nativeService.triggerHaptic('light');
     if (nativeService.isNative()) {
@@ -186,9 +188,19 @@ export const ReportPage: React.FC = () => {
         setImageError(null);
         return;
       }
+      if (result.error && result.error !== 'Photo selection cancelled') {
+        setIsCameraModalOpen(true);
+      }
+      return;
     }
-    // Fallback to browser file input
-    fileInputRef.current?.click();
+    // Launch live camera modal on web browsers
+    setIsCameraModalOpen(true);
+  };
+
+  const handleLiveCameraCapture = (file: File, dataUrl: string) => {
+    setSelectedFile(file);
+    setPreviewUrl(dataUrl);
+    setImageError(null);
   };
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -950,6 +962,15 @@ export const ReportPage: React.FC = () => {
           </div>
         </div>
       </form>
+
+      {/* Live Camera Modal for Web & Native */}
+      <LiveCameraModal
+        isOpen={isCameraModalOpen}
+        onClose={() => setIsCameraModalOpen(false)}
+        onCapture={handleLiveCameraCapture}
+        onBrowseFiles={() => fileInputRef.current?.click()}
+        title="Capture Issue Evidence"
+      />
     </div>
   );
 };

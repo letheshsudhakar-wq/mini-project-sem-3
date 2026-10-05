@@ -10,10 +10,12 @@ import {
 } from 'lucide-react';
 import { COMPLAINT_CATEGORIES } from '../utils/constants';
 import { LocationPickerMap } from './LocationPickerMap';
+import { LiveCameraModal } from './LiveCameraModal';
 import { reverseGeocode } from '../services/geocoding';
 import { compressImage } from '../utils/imageCompressor';
 import { storageService } from '../services/storage';
 import { complaintsService } from '../services/complaints';
+import { nativeService } from '../services/nativeService';
 import { useAuth } from '../hooks/useAuth';
 import type { Complaint, ComplaintCategory } from '../types';
 
@@ -48,6 +50,7 @@ export const EditComplaintModal: React.FC<EditComplaintModalProps> = ({
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const geocodeAbortRef = useRef<AbortController | null>(null);
@@ -106,6 +109,30 @@ export const EditComplaintModal: React.FC<EditComplaintModalProps> = ({
       },
       { timeout: 8000 }
     );
+  };
+
+  const handleTriggerCamera = async () => {
+    nativeService.triggerHaptic('light');
+    if (nativeService.isNative()) {
+      const result = await nativeService.capturePhoto();
+      if (result.file && result.dataUrl) {
+        setNewPhotoFile(result.file);
+        setPhotoPreview(result.dataUrl);
+        setErrorMsg(null);
+        return;
+      }
+      if (result.error && result.error !== 'Photo selection cancelled') {
+        setIsCameraModalOpen(true);
+      }
+      return;
+    }
+    setIsCameraModalOpen(true);
+  };
+
+  const handleLiveCameraCapture = (file: File, dataUrl: string) => {
+    setNewPhotoFile(file);
+    setPhotoPreview(dataUrl);
+    setErrorMsg(null);
   };
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,12 +307,22 @@ export const EditComplaintModal: React.FC<EditComplaintModalProps> = ({
                 </button>
               </div>
             ) : (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-4 text-center cursor-pointer bg-slate-50/50 flex items-center justify-center gap-2"
-              >
-                <Camera className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-medium text-slate-700">Attach new photo</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleTriggerCamera}
+                  className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-3.5 text-center cursor-pointer bg-slate-50/50 flex items-center justify-center gap-2 active:scale-95 transition"
+                >
+                  <Camera className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs font-bold text-slate-700">Take Photo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-3.5 text-center cursor-pointer bg-slate-50/50 flex items-center justify-center gap-2 active:scale-95 transition"
+                >
+                  <span className="text-xs font-bold text-slate-700">Browse Files</span>
+                </button>
               </div>
             )}
             <input
@@ -346,6 +383,14 @@ export const EditComplaintModal: React.FC<EditComplaintModalProps> = ({
           </div>
         </form>
       </div>
+
+      <LiveCameraModal
+        isOpen={isCameraModalOpen}
+        onClose={() => setIsCameraModalOpen(false)}
+        onCapture={handleLiveCameraCapture}
+        onBrowseFiles={() => fileInputRef.current?.click()}
+        title="Update Evidence Photo"
+      />
     </div>
   );
 };
