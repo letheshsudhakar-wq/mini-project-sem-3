@@ -3,13 +3,14 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Menu, 
-  AlertCircle, 
   Sparkles, 
   Check, 
   RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { nativeService } from '../services/nativeService';
+
+import { CivicLogoIcon } from './CivicLogo';
 
 interface MobileHeaderProps {
   onOpenDrawer: () => void;
@@ -71,10 +72,9 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             <Link 
               to="/" 
               className="flex items-center gap-2 font-bold text-slate-900 group shrink-0"
+              aria-label="CivicFix Home"
             >
-              <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shadow-blue-500/20">
-                <AlertCircle className="w-4 h-4" />
-              </div>
+              <CivicLogoIcon size="sm" />
             </Link>
           )}
 

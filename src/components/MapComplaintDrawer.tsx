@@ -57,11 +57,11 @@ export const MapComplaintDrawer: React.FC<MapComplaintDrawerProps> = ({
       </div>
 
       {/* Description & Thumbnail */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex items-start gap-3.5 sm:gap-4">
         {complaint.photo_url && (
           <div 
             onClick={() => setSelectedPhoto(complaint.photo_url)}
-            className="w-full sm:w-28 h-32 sm:h-28 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 relative group cursor-pointer"
+            className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 relative group cursor-pointer aspect-square"
           >
             <img
               src={complaint.photo_url}

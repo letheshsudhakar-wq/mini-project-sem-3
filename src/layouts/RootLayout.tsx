@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
-  AlertCircle, 
   MapPin, 
   PlusCircle, 
   ListFilter, 
@@ -17,6 +16,7 @@ import {
   Check
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { CivicLogo } from '../components/CivicLogo';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { MobileDrawer } from '../components/MobileDrawer';
 import { MobileHeader } from '../components/MobileHeader';
@@ -73,15 +73,10 @@ export const RootLayout: React.FC = () => {
           <div className="flex items-center gap-8">
             <Link 
               to="/" 
-              className="flex items-center gap-2.5 font-bold text-xl text-slate-900 tracking-tight group"
+              className="group"
+              aria-label="CivicFix Home"
             >
-              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/20 group-hover:bg-blue-700 transition">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <span className="leading-tight text-slate-900 font-extrabold">Civic<span className="text-blue-600">Fix</span></span>
-                <span className="text-[10px] text-slate-500 font-medium tracking-normal -mt-0.5">Civic Grievance Platform</span>
-              </div>
+              <CivicLogo size="md" />
             </Link>
 
             {/* Desktop Navigation Links */}

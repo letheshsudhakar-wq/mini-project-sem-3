@@ -35,9 +35,9 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({ complaint }) => {
 
       {/* Middle: Content with Thumbnail */}
       <div className="flex items-start gap-3.5">
-        {/* Optional Thumbnail */}
+        {/* Thumbnail */}
         {complaint.photo_url ? (
-          <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200 shadow-2xs">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200 aspect-square">
             <img
               src={complaint.photo_url}
               alt="Issue evidence thumbnail"
@@ -46,8 +46,8 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({ complaint }) => {
             />
           </div>
         ) : (
-          <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-slate-50 border border-dashed border-slate-200 shrink-0 flex items-center justify-center text-slate-300">
-            <ImageIcon className="w-6 h-6" />
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-50 border border-dashed border-slate-200 shrink-0 flex items-center justify-center text-slate-300 aspect-square">
+            <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
         )}
 

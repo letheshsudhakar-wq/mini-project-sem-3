@@ -19,6 +19,7 @@ import { useAuth } from '../hooks/useAuth';
 import { formatAuthError } from '../utils/authErrors';
 import { nativeService } from '../services/nativeService';
 import { useToast } from '../contexts/ToastContext';
+import { CivicLogoIcon } from '../components/CivicLogo';
 
 const GoogleIcon: React.FC = () => (
   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -185,8 +186,8 @@ export const LoginPage: React.FC = () => {
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Header Banner */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-blue-950 p-6 sm:p-8 text-white text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-400/30 text-blue-400 mx-auto flex items-center justify-center shadow-inner">
-            <LogIn className="w-6 h-6 text-blue-300" />
+          <div className="flex justify-center">
+            <CivicLogoIcon size="lg" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Sign In to CivicFix</h1>
           <p className="text-xs sm:text-sm text-slate-300">

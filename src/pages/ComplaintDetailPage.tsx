@@ -437,7 +437,7 @@ export const ComplaintDetailPage: React.FC = () => {
                 </div>
                 <div 
                   onClick={() => setSelectedPhoto(complaint.photo_url)}
-                  className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 h-52 sm:h-64 cursor-pointer group"
+                  className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 h-44 sm:h-52 cursor-pointer group"
                 >
                   <img
                     src={complaint.photo_url}

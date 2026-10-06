@@ -484,7 +484,7 @@ export const LiveCameraModal: React.FC<LiveCameraModalProps> = ({
                   onClick={handleCapture}
                   disabled={isLoading || !!cameraError}
                   aria-label="Capture Photo"
-                  className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-white hover:bg-slate-100 active:scale-90 p-1.5 shadow-xl transition flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer group"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white hover:bg-slate-100 active:scale-90 p-1.5 shadow-xl transition flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer group"
                 >
                   <div className="w-full h-full rounded-full border-2 border-slate-900 group-hover:scale-95 transition-transform bg-white" />
                 </button>
