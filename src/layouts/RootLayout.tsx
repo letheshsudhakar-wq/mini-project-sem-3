@@ -20,11 +20,14 @@ import { CivicLogo } from '../components/CivicLogo';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { MobileDrawer } from '../components/MobileDrawer';
 import { MobileHeader } from '../components/MobileHeader';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useLanguage } from '../i18n';
 
 export const RootLayout: React.FC = () => {
   const { user, profile, role, isAdmin, isConfigured, isDemoMode, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -33,7 +36,7 @@ export const RootLayout: React.FC = () => {
     if (path !== '/' && location.pathname.startsWith(path)) return true;
     return false;
   };
-  const displayRole = role === 'admin' ? 'Government Official' : 'Citizen';
+  const displayRole = role === 'admin' ? t('role.admin') : t('role.citizen');
 
   const handleSignOut = async () => {
     setIsLoggingOut(true);
@@ -41,6 +44,7 @@ export const RootLayout: React.FC = () => {
       const { error } = await signOut();
       if (error) {
         console.error('Logout error:', error);
+        return;
       }
       navigate('/login', { replace: true });
     } catch (err) {
@@ -61,7 +65,7 @@ export const RootLayout: React.FC = () => {
         <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-xs sm:text-sm text-amber-900 text-center flex items-center justify-center gap-2">
           <Database className="w-3.5 h-3.5 text-amber-700 shrink-0" />
           <span>
-            <strong>Offline / Demo Mode:</strong> Using local mock database. Add Supabase keys to <code className="bg-amber-100 font-mono text-[11px] px-1 py-0.5 rounded border border-amber-300">.env</code> for live cloud sync.
+            <strong>{t('nav.offlineMode')}</strong> {t('nav.offlineDescription')} <code className="bg-amber-100 font-mono text-[11px] px-1 py-0.5 rounded border border-amber-300">.env</code> {t('nav.forCloudSync')}
           </span>
         </div>
       )}
@@ -93,7 +97,7 @@ export const RootLayout: React.FC = () => {
                       }`}
                     >
                       <ListFilter className="w-4 h-4" />
-                      My Complaints
+                      {t('nav.complaints')}
                     </Link>
 
                     <Link
@@ -105,7 +109,7 @@ export const RootLayout: React.FC = () => {
                       }`}
                     >
                       <PlusCircle className="w-4 h-4" />
-                      Report Issue
+                      {t('nav.report')}
                     </Link>
                   </>
                 )}
@@ -121,7 +125,7 @@ export const RootLayout: React.FC = () => {
                     }`}
                   >
                     <ShieldCheck className="w-4 h-4" />
-                    Government Dashboard
+                    {t('nav.government')}
                   </Link>
                 )}
 
@@ -136,7 +140,7 @@ export const RootLayout: React.FC = () => {
                     }`}
                   >
                     <MapPin className="w-4 h-4" />
-                    Map
+                    {t('nav.map')}
                   </Link>
                 )}
               </nav>
@@ -145,16 +149,17 @@ export const RootLayout: React.FC = () => {
 
           {/* Desktop Right User Controls */}
           <div className="flex items-center gap-3">
+            <LanguageSelector />
             {/* Live vs Demo Pill */}
             {isDemoMode ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
                 <Sparkles className="w-3 h-3 text-amber-600" />
-                Demo Store
+                {t('nav.demoStore')}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
                 <Check className="w-3 h-3 text-emerald-600" />
-                Supabase Connected
+                {t('nav.supabaseConnected')}
               </span>
             )}
 
@@ -178,8 +183,8 @@ export const RootLayout: React.FC = () => {
                   onClick={handleSignOut}
                   disabled={isLoggingOut}
                   className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer disabled:opacity-50"
-                  title="Sign out"
-                  aria-label="Sign out"
+                  title={t('nav.signOut')}
+                  aria-label={t('nav.signOut')}
                 >
                   {isLoggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
                 </button>
@@ -192,7 +197,7 @@ export const RootLayout: React.FC = () => {
                     className="inline-flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-slate-900 px-3.5 py-2 rounded-xl hover:bg-slate-100 transition"
                   >
                     <LogIn className="w-4 h-4" />
-                    Sign In
+                    {t('nav.signIn')}
                   </Link>
                 )}
                 {location.pathname !== '/signup' && (
@@ -201,7 +206,7 @@ export const RootLayout: React.FC = () => {
                     className="inline-flex items-center gap-1.5 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-xs transition"
                   >
                     <UserPlus className="w-4 h-4" />
-                    Sign Up
+                    {t('nav.signUp')}
                   </Link>
                 )}
               </div>
@@ -227,12 +232,12 @@ export const RootLayout: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-            <span>CivicFix Civic Grievance Platform • Authentication & Role System Active</span>
+            <span>{t('footer.platform')}</span>
           </div>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
               <Layers className="w-3.5 h-3.5 text-slate-400" />
-              Supabase Auth + Row Level Security + Mobile Capacitor Ready
+              {t('footer.technical')}
             </span>
           </div>
         </div>

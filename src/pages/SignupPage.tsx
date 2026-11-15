@@ -16,10 +16,11 @@ import {
   Check
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { formatAuthError } from '../utils/authErrors';
+import { localizeAuthError } from '../utils/authErrors';
 import { nativeService } from '../services/nativeService';
 import { useToast } from '../contexts/ToastContext';
 import { CivicLogoIcon } from '../components/CivicLogo';
+import { useLanguage } from '../i18n';
 
 const GoogleIcon: React.FC = () => (
   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -44,6 +45,7 @@ const GoogleIcon: React.FC = () => (
 
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { signUp, signInWithGoogle, isDemoMode, isAuthenticated, role, isAdmin } = useAuth();
   const { success, error: toastError } = useToast();
 
@@ -76,41 +78,41 @@ export const SignupPage: React.FC = () => {
     try {
       const { error } = await signInWithGoogle();
       if (error) {
-        setErrorMessage(formatAuthError(error));
-        toastError('Google registration failed');
+        setErrorMessage(localizeAuthError(error, t));
+        toastError(t('auth.googleRegistrationFailed'));
         setIsGoogleSubmitting(false);
         return;
       }
       if (isDemoMode) {
-        success('Account created successfully');
+        success(t('auth.accountCreated'));
         navigate('/complaints', { replace: true });
       }
     } catch (err) {
-      setErrorMessage(formatAuthError(err));
+      setErrorMessage(localizeAuthError(err, t));
       setIsGoogleSubmitting(false);
     }
   };
 
   const validateForm = (): string | null => {
     if (!name.trim()) {
-      return 'Please provide your full name.';
+      return t('auth.nameRequired');
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim() || !emailRegex.test(email.trim())) {
-      return 'Please enter a valid email address.';
+      return t('auth.invalidEmail');
     }
 
     if (!password) {
-      return 'Please create a password.';
+      return t('auth.passwordRequired');
     }
 
     if (password.length < 6) {
-      return 'Password must be at least 6 characters in length.';
+      return t('auth.passwordTooShort');
     }
 
     if (password !== confirmPassword) {
-      return 'Passwords do not match. Please re-enter identical passwords.';
+      return t('auth.passwordMismatch');
     }
 
     return null;
@@ -139,8 +141,8 @@ export const SignupPage: React.FC = () => {
       });
 
       if (error) {
-        setErrorMessage(formatAuthError(error));
-        toastError('Sign up error');
+        setErrorMessage(localizeAuthError(error, t));
+        toastError(t('auth.signupFailed'));
         setIsSubmitting(false);
         return;
       }
@@ -152,9 +154,9 @@ export const SignupPage: React.FC = () => {
           emailVerificationNeeded: true,
           email: email.trim(),
         });
-        success('Verification link sent');
+        success(t('auth.verificationSent'));
       } else if (user) {
-        success('Welcome to CivicFix! Account created.');
+        success(t('auth.welcome'));
         navigate('/complaints', { replace: true });
       } else {
         setSuccessInfo({
@@ -163,7 +165,7 @@ export const SignupPage: React.FC = () => {
         });
       }
     } catch (err) {
-      setErrorMessage(formatAuthError(err));
+      setErrorMessage(localizeAuthError(err, t));
     } finally {
       setIsSubmitting(false);
     }
@@ -177,9 +179,9 @@ export const SignupPage: React.FC = () => {
           <div className="flex justify-center">
             <CivicLogoIcon size="lg" />
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">Create Citizen Account</h1>
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">{t('auth.createCitizenAccount')}</h1>
           <p className="text-xs sm:text-sm text-blue-100">
-            Join CivicFix to report, upvote, and track neighborhood issues
+            {t('auth.signupDescription')}
           </p>
 
           {/* Mode Pill */}
@@ -187,12 +189,12 @@ export const SignupPage: React.FC = () => {
             {isDemoMode ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-400/20 border border-amber-400/30 text-amber-200">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                Demo Mode Active
+                {t('auth.demoMode')}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-400/20 border border-emerald-400/30 text-emerald-200">
                 <Check className="w-3.5 h-3.5 text-emerald-300" />
-                Supabase Live Connected
+                {t('auth.liveConnected')}
               </span>
             )}
           </div>
@@ -206,15 +208,15 @@ export const SignupPage: React.FC = () => {
               <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
-              <h3 className="text-sm font-bold text-emerald-900">Check Your Email</h3>
+              <h3 className="text-sm font-bold text-emerald-900">{t('auth.checkEmail')}</h3>
               <p className="text-xs text-emerald-800 leading-relaxed">
-                We sent a confirmation link to <strong>{successInfo.email}</strong>. Please verify your email to log in.
+                {t('auth.confirmationSent', { email: successInfo.email })}
               </p>
               <Link
                 to="/login"
                 className="inline-block px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold"
               >
-                Go to Sign In
+                {t('auth.goToSignIn')}
               </Link>
             </div>
           )}
@@ -243,7 +245,7 @@ export const SignupPage: React.FC = () => {
               ) : (
                 <GoogleIcon />
               )}
-              <span>Continue with Google</span>
+              <span>{t('auth.continueGoogle')}</span>
             </button>
           </div>
 
@@ -254,7 +256,7 @@ export const SignupPage: React.FC = () => {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-white px-2.5 text-slate-400 font-bold tracking-wider text-[10px]">
-                Or fill registration details
+                {t('auth.orEmailPassword')}
               </span>
             </div>
           </div>
@@ -266,7 +268,7 @@ export const SignupPage: React.FC = () => {
                 htmlFor="signup-name" 
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
               >
-                Full Name <span className="text-rose-500">*</span>
+                {t('auth.fullName')} <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
@@ -279,7 +281,7 @@ export const SignupPage: React.FC = () => {
                     setName(e.target.value);
                     if (errorMessage) setErrorMessage(null);
                   }}
-                  placeholder="e.g. John Doe"
+                  placeholder={t('auth.nameExample')}
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
                 />
               </div>
@@ -291,7 +293,7 @@ export const SignupPage: React.FC = () => {
                 htmlFor="signup-email" 
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
               >
-                Email Address <span className="text-rose-500">*</span>
+                {t('auth.email')} <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
@@ -317,7 +319,7 @@ export const SignupPage: React.FC = () => {
                 htmlFor="signup-phone" 
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
               >
-                Phone Number <span className="text-slate-400 lowercase font-normal">(optional)</span>
+                {t('auth.phone')} <span className="text-slate-400 lowercase font-normal">{t('auth.optional')}</span>
               </label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
@@ -327,7 +329,7 @@ export const SignupPage: React.FC = () => {
                   autoComplete="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1 (555) 000-0000"
+                  placeholder="+91 00000 00000"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
                 />
               </div>
@@ -339,7 +341,7 @@ export const SignupPage: React.FC = () => {
                 htmlFor="signup-password" 
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
               >
-                Password <span className="text-rose-500">*</span>
+                {t('auth.password')} <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
@@ -353,14 +355,14 @@ export const SignupPage: React.FC = () => {
                     setPassword(e.target.value);
                     if (errorMessage) setErrorMessage(null);
                   }}
-                  placeholder="At least 6 characters"
+                  placeholder={t('auth.passwordMin')}
                   className="w-full pl-10 pr-11 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-slate-600 focus:outline-none transition cursor-pointer"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -373,7 +375,7 @@ export const SignupPage: React.FC = () => {
                 htmlFor="signup-confirm-password" 
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
               >
-                Confirm Password <span className="text-rose-500">*</span>
+                {t('auth.confirmPassword')} <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
@@ -387,7 +389,7 @@ export const SignupPage: React.FC = () => {
                     setConfirmPassword(e.target.value);
                     if (errorMessage) setErrorMessage(null);
                   }}
-                  placeholder="Re-enter password"
+                  placeholder={t('auth.reenterPassword')}
                   className="w-full pl-10 pr-11 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
                 />
               </div>
@@ -402,12 +404,12 @@ export const SignupPage: React.FC = () => {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Creating Account...</span>
+                  <span>{t('auth.creatingAccount')}</span>
                 </>
               ) : (
                 <>
                   <UserPlus className="w-4 h-4" />
-                  <span>Create Account</span>
+                  <span>{t('auth.createAccount')}</span>
                   <ArrowRight className="w-4 h-4 ml-1 opacity-70" />
                 </>
               )}
@@ -416,12 +418,12 @@ export const SignupPage: React.FC = () => {
 
           {/* Footer Link to Login */}
           <div className="pt-2 border-t border-slate-100 text-center text-xs text-slate-500">
-            Already have an account?{' '}
+            {t('auth.haveAccount')}{' '}
             <Link 
               to="/login" 
               className="font-bold text-blue-600 hover:text-blue-700 hover:underline transition"
             >
-              Sign In
+              {t('auth.submitSignIn')}
             </Link>
           </div>
         </div>

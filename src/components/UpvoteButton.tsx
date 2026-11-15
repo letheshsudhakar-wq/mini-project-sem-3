@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { ThumbsUp, Loader2, Check } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { complaintsService } from '../services/complaints';
+import { useToast } from '../contexts/ToastContext';
+import { useLanguage } from '../i18n';
 
 interface UpvoteButtonProps {
   complaintId: string;
@@ -17,6 +19,8 @@ export const UpvoteButton: React.FC<UpvoteButtonProps> = ({
   className = '',
 }) => {
   const { user } = useAuth();
+  const { error: toastError } = useToast();
+  const { t, formatNumber, plural } = useLanguage();
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [upvoteCount, setUpvoteCount] = useState(initialUpvoteCount);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,11 +30,22 @@ export const UpvoteButton: React.FC<UpvoteButtonProps> = ({
   useEffect(() => {
     let isMounted = true;
     if (user) {
-      complaintsService.checkUserUpvote(complaintId, user.id).then(({ hasUpvoted: voted }) => {
+      setIsCheckingInitial(true);
+      complaintsService.checkUserUpvote(complaintId, user.id).then(({ hasUpvoted: voted, error }) => {
         if (isMounted) {
-          setHasUpvoted(voted);
+          if (error) {
+            console.error('[CivicFix Upvote] Failed to check the current vote:', error);
+            toastError(t('upvote.saveFailed'));
+          } else {
+            setHasUpvoted(voted);
+          }
           setIsCheckingInitial(false);
         }
+      }).catch((error: unknown) => {
+        if (!isMounted) return;
+        console.error('[CivicFix Upvote] Failed to check the current vote:', error);
+        toastError(t('upvote.saveFailed'));
+        setIsCheckingInitial(false);
       });
     } else {
       setIsCheckingInitial(false);
@@ -38,7 +53,7 @@ export const UpvoteButton: React.FC<UpvoteButtonProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [complaintId, user]);
+  }, [complaintId, t, toastError, user]);
 
   useEffect(() => {
     setUpvoteCount(initialUpvoteCount);
@@ -48,29 +63,33 @@ export const UpvoteButton: React.FC<UpvoteButtonProps> = ({
     if (!user || isLoading) return;
 
     setIsLoading(true);
-
-    if (hasUpvoted) {
-      // Remove Upvote
-      const { error } = await complaintsService.removeUpvote(complaintId, user.id);
-      setIsLoading(false);
-
-      if (!error) {
+    try {
+      if (hasUpvoted) {
+        const { error } = await complaintsService.removeUpvote(complaintId, user.id);
+        if (error) {
+          toastError(t('upvote.saveFailed'));
+          return;
+        }
         const newCount = Math.max(0, upvoteCount - 1);
         setHasUpvoted(false);
         setUpvoteCount(newCount);
         if (onUpvoteChange) onUpvoteChange(newCount, false);
-      }
-    } else {
-      // Add Upvote
-      const { error } = await complaintsService.addUpvote(complaintId, user.id);
-      setIsLoading(false);
-
-      if (!error) {
+      } else {
+        const { error } = await complaintsService.addUpvote(complaintId, user.id);
+        if (error) {
+          toastError(t('upvote.saveFailed'));
+          return;
+        }
         const newCount = upvoteCount + 1;
         setHasUpvoted(true);
         setUpvoteCount(newCount);
         if (onUpvoteChange) onUpvoteChange(newCount, true);
       }
+    } catch (error) {
+      console.error('[CivicFix Upvote] Failed to update the vote:', error);
+      toastError(t('upvote.saveFailed'));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -84,7 +103,8 @@ export const UpvoteButton: React.FC<UpvoteButtonProps> = ({
           ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20'
           : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
       } ${className}`}
-      title={user ? (hasUpvoted ? 'Click to remove upvote' : 'Upvote to prioritize this issue') : 'Sign in to upvote'}
+      title={user ? (hasUpvoted ? t('upvote.removeTitle') : t('upvote.addTitle')) : t('upvote.signInTitle')}
+      aria-label={`${hasUpvoted ? t('upvote.remove') : t('upvote.add')}, ${plural('plural.issue', upvoteCount)}`}
     >
       {isLoading ? (
         <Loader2 className="w-4 h-4 animate-spin" />
@@ -94,11 +114,11 @@ export const UpvoteButton: React.FC<UpvoteButtonProps> = ({
         <ThumbsUp className="w-4 h-4 text-amber-500" />
       )}
 
-      <span>{hasUpvoted ? 'Upvoted' : 'Upvote Issue'}</span>
+      <span>{hasUpvoted ? t('upvote.remove') : t('upvote.add')}</span>
       <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
         hasUpvoted ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
       }`}>
-        {upvoteCount}
+        {formatNumber(upvoteCount)}
       </span>
     </button>
   );

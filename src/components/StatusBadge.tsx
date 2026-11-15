@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ComplaintStatus } from '../types';
+import { useLanguage } from '../i18n';
 
 interface StatusBadgeProps {
   status: ComplaintStatus;
@@ -14,32 +15,33 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   className = '',
   labelOverride,
 }) => {
+  const { t } = useLanguage();
   const getStatusConfig = (s: ComplaintStatus) => {
     switch (s) {
       case 'reported':
         return {
-          label: 'Reported',
+          label: t('status.reported'),
           dotColor: 'bg-amber-500',
           badgeColor: 'bg-amber-50 text-amber-800 border-amber-200/80',
           emoji: '🟡',
         };
       case 'in_progress':
         return {
-          label: 'In Progress',
+          label: t('status.in_progress'),
           dotColor: 'bg-blue-500',
           badgeColor: 'bg-blue-50 text-blue-800 border-blue-200/80',
           emoji: '🔵',
         };
       case 'resolved':
         return {
-          label: 'Resolved',
+          label: t('status.resolved'),
           dotColor: 'bg-emerald-500',
           badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-200/80',
           emoji: '🟢',
         };
       case 'rejected':
         return {
-          label: 'Rejected',
+          label: t('status.rejected'),
           dotColor: 'bg-rose-500',
           badgeColor: 'bg-rose-50 text-rose-800 border-rose-200/80',
           emoji: '🔴',

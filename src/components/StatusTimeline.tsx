@@ -9,6 +9,7 @@ import {
 import { StatusBadge } from './StatusBadge';
 import { ImageModal } from './ImageModal';
 import type { Complaint, ComplaintUpdate } from '../types';
+import { useLanguage } from '../i18n';
 
 interface StatusTimelineProps {
   complaint: Complaint;
@@ -22,16 +23,16 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
   isLoading = false,
 }) => {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const { t, formatDate } = useLanguage();
 
   // Format date helper
   const formatDateTime = (isoDate: string) => {
-    return new Date(isoDate).toLocaleString('en-US', {
+    return formatDate(isoDate, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true,
     });
   };
 
@@ -65,7 +66,7 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <StatusBadge status="reported" size="sm" />
-                <span className="text-xs font-bold text-slate-800">Grievance Registered</span>
+                <span className="text-xs font-bold text-slate-800">{t('timeline.registered')}</span>
               </div>
               <span className="text-[11px] text-slate-400 font-medium">
                 {formatDateTime(complaint.created_at)}
@@ -73,13 +74,13 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Complaint filed by citizen with location coordinates and preliminary description.
+              {t('timeline.initialDescription')}
             </p>
 
             {complaint.photo_url && (
               <div className="pt-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                  Citizen Evidence Photo
+                  {t('timeline.citizenEvidence')}
                 </span>
                 <button
                   type="button"
@@ -88,7 +89,7 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
                 >
                   <img
                     src={complaint.photo_url}
-                    alt="Citizen uploaded evidence"
+                    alt={t('timeline.citizenUploaded')}
                     className="w-full h-full object-cover group-hover/thumb:scale-105 transition"
                   />
                   <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center text-white transition">
@@ -132,7 +133,7 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
                   <div className="flex items-center gap-2">
                     <StatusBadge status={update.status} size="sm" />
                     <span className="text-xs font-bold text-slate-800">
-                      {isCitizenFeedback ? 'Citizen Resolution Feedback' : 'Official Status Update'}
+                      {isCitizenFeedback ? t('timeline.citizenFeedback') : t('timeline.officialUpdate')}
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-400 font-medium">
@@ -146,14 +147,14 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
                   </p>
                 ) : (
                   <p className="text-xs text-slate-500">
-                    Status changed to <strong className="capitalize">{update.status.replace('_', ' ')}</strong> by municipal authority.
+                    {t('timeline.statusChanged', { status: t(`status.${update.status}`) })}
                   </p>
                 )}
 
                 {update.photo_url && (
                   <div className="pt-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                      Municipal Resolution Proof Photo
+                      {t('timeline.resolutionProof')}
                     </span>
                     <button
                       type="button"
@@ -162,7 +163,7 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
                     >
                       <img
                         src={update.photo_url}
-                        alt="Resolution proof"
+                        alt={t('timeline.resolutionAlt')}
                         className="w-full h-full object-cover group-hover/thumb:scale-105 transition"
                       />
                       <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center text-white transition">

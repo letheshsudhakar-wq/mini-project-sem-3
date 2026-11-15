@@ -45,6 +45,7 @@ export const AdminPage: React.FC = () => {
     department_counts: {},
   });
   const [isLoadingStats, setIsLoadingStats] = useState<boolean>(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   // Complaints Table State
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -74,8 +75,12 @@ export const AdminPage: React.FC = () => {
   // 1. Fetch Summary Statistics
   const fetchStats = useCallback(async () => {
     setIsLoadingStats(true);
-    const { data } = await complaintsService.getAdminDashboardStats();
-    if (data) {
+    const { data, error } = await complaintsService.getAdminDashboardStats();
+    if (error) {
+      console.error('[CivicFix Admin] Failed to load dashboard statistics:', error);
+      setStatsError('Failed to load dashboard statistics. Please refresh and try again.');
+    } else {
+      setStatsError(null);
       setStats(data);
     }
     setIsLoadingStats(false);
@@ -252,6 +257,14 @@ export const AdminPage: React.FC = () => {
         onSelectStatus={handleStatusFilterChange}
         isLoading={isLoadingStats}
       />
+      {statsError && (
+        <div role="alert" className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center justify-between gap-3">
+          <span>{statsError}</span>
+          <button type="button" onClick={fetchStats} className="font-bold underline shrink-0">
+            Retry
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-white p-4 rounded-2xl border border-rose-200 flex items-center gap-3">

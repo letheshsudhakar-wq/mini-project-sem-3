@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email TEXT,
   phone TEXT,
   role TEXT NOT NULL DEFAULT 'citizen' CHECK (role IN ('citizen', 'admin')),
+  preferred_language TEXT NOT NULL DEFAULT 'en' CHECK (preferred_language IN ('en', 'hi', 'kn', 'ta')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 CREATE TABLE IF NOT EXISTS public.complaints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  category TEXT NOT NULL CHECK (category IN ('pothole', 'streetlight', 'drainage', 'garbage', 'other')),
+  category TEXT NOT NULL CHECK (category IN ('pothole', 'streetlight', 'drainage', 'garbage', 'water_supply', 'road_damage', 'other')),
   description TEXT NOT NULL,
   photo_url TEXT,
   resolution_photo_url TEXT,

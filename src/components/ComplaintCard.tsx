@@ -5,15 +5,18 @@ import { StatusBadge } from './StatusBadge';
 import { COMPLAINT_CATEGORIES } from '../utils/constants';
 import { nativeService } from '../services/nativeService';
 import type { Complaint } from '../types';
+import { getCategoryTranslationKey, useLanguage } from '../i18n';
 
 interface ComplaintCardProps {
   complaint: Complaint;
 }
 
 export const ComplaintCard: React.FC<ComplaintCardProps> = ({ complaint }) => {
+  const { t, formatDate } = useLanguage();
   const categoryInfo = COMPLAINT_CATEGORIES.find((c) => c.value === complaint.category);
-
-  const formattedDate = new Date(complaint.created_at).toLocaleDateString('en-US', {
+  const categoryKey = getCategoryTranslationKey(complaint.category);
+  const categoryLabel = categoryKey ? t(categoryKey) : categoryInfo?.label || complaint.category;
+  const formattedDate = formatDate(complaint.created_at, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -28,7 +31,7 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({ complaint }) => {
       {/* Top Header: Category & Status */}
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 group-hover:bg-blue-50 group-hover:text-blue-700 px-2.5 py-1 rounded-xl transition">
-          {categoryInfo?.label || complaint.category}
+          {categoryLabel}
         </span>
         <StatusBadge status={complaint.status} size="sm" />
       </div>
@@ -40,7 +43,7 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({ complaint }) => {
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200 aspect-square">
             <img
               src={complaint.photo_url}
-              alt="Issue evidence thumbnail"
+              alt={`${categoryLabel} evidence thumbnail`}
               className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
               loading="lazy"
             />
@@ -58,7 +61,7 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({ complaint }) => {
 
           <p className="text-[11px] sm:text-xs text-slate-500 flex items-center gap-1 truncate">
             <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
-            <span className="truncate">{complaint.address || 'Location Coordinates Logged'}</span>
+            <span className="truncate">{complaint.address || t('complaint.locationCoordinates')}</span>
           </p>
         </div>
       </div>
@@ -77,7 +80,7 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({ complaint }) => {
         </div>
 
         <span className="inline-flex items-center gap-1 font-bold text-xs text-blue-600 group-hover:translate-x-0.5 transition">
-          View
+          {t('common.view')}
           <ArrowRight className="w-3.5 h-3.5" />
         </span>
       </div>

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { nativeService } from '../services/nativeService';
+import { useLanguage } from '../i18n';
 
 interface MobileBottomNavProps {
   onOpenDrawer: () => void;
@@ -18,6 +19,7 @@ interface MobileBottomNavProps {
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenDrawer }) => {
   const { user, isAdmin, isAuthenticated } = useAuth();
   const location = useLocation();
+  const { t } = useLanguage();
 
   const handleNavTap = () => {
     nativeService.triggerHaptic('light');
@@ -46,7 +48,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenDrawer }
           }`}
         >
           <Home className={`w-5 h-5 transition-transform ${isCurrent('/') && location.pathname === '/' ? 'scale-110 stroke-[2.5]' : 'stroke-2'}`} />
-          <span className="text-[10px] tracking-tight mt-1">Home</span>
+          <span className="text-[10px] tracking-tight mt-1">{t('nav.home')}</span>
         </NavLink>
 
         {/* 2. Complaints Tab */}
@@ -60,7 +62,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenDrawer }
           }`}
         >
           <ListFilter className={`w-5 h-5 transition-transform ${isCurrent('/complaints') ? 'scale-110 stroke-[2.5]' : 'stroke-2'}`} />
-          <span className="text-[10px] tracking-tight mt-1">Issues</span>
+          <span className="text-[10px] tracking-tight mt-1">{t('nav.issues')}</span>
         </NavLink>
 
         {/* 3. Central Prominent Report Button */}
@@ -68,12 +70,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenDrawer }
           to={isAuthenticated ? '/report' : '/login'}
           onClick={handleNavTap}
           className="flex flex-col items-center justify-center -mt-5 group"
-          aria-label="Report New Civic Issue"
+          aria-label={t('nav.report')}
         >
           <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/35 border-2 border-white group-active:scale-90 transition-all duration-150">
             <PlusCircle className="w-6 h-6 stroke-[2.5]" />
           </div>
-          <span className="text-[10px] font-bold text-blue-700 tracking-tight mt-0.5">Report</span>
+          <span className="text-[10px] font-bold text-blue-700 tracking-tight mt-0.5">{t('nav.report')}</span>
         </NavLink>
 
         {/* 4. Map Tab */}
@@ -87,7 +89,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenDrawer }
           }`}
         >
           <MapPin className={`w-5 h-5 transition-transform ${isCurrent('/map') ? 'scale-110 stroke-[2.5]' : 'stroke-2'}`} />
-          <span className="text-[10px] tracking-tight mt-1">Map</span>
+          <span className="text-[10px] tracking-tight mt-1">{t('nav.map')}</span>
         </NavLink>
 
         {/* 5. Admin Tab or Profile Drawer Trigger */}
@@ -102,7 +104,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenDrawer }
             }`}
           >
             <ShieldCheck className={`w-5 h-5 transition-transform ${isCurrent('/admin') ? 'scale-110 stroke-[2.5]' : 'stroke-2'}`} />
-            <span className="text-[10px] tracking-tight mt-1">Admin</span>
+            <span className="text-[10px] tracking-tight mt-1">{t('nav.government')}</span>
           </NavLink>
         ) : (
           <button
@@ -112,7 +114,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenDrawer }
               onOpenDrawer();
             }}
             className="flex flex-col items-center justify-center min-w-[56px] py-1 px-1 rounded-xl text-slate-500 hover:text-slate-800 transition-all duration-150 active:scale-95 cursor-pointer"
-            aria-label="Open Profile and Settings Menu"
+            aria-label={t('nav.settings')}
           >
             {isAuthenticated ? (
               <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold text-[10px] flex items-center justify-center border border-blue-200">
@@ -121,7 +123,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenDrawer }
             ) : (
               <LogIn className="w-5 h-5 stroke-2" />
             )}
-            <span className="text-[10px] tracking-tight mt-1">{isAuthenticated ? 'Profile' : 'Sign In'}</span>
+            <span className="text-[10px] tracking-tight mt-1">{isAuthenticated ? t('nav.citizen') : t('nav.signIn')}</span>
           </button>
         )}
       </div>

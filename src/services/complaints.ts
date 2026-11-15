@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import type { 
   Complaint, 
   ComplaintCategory, 
@@ -162,7 +162,7 @@ export const complaintsService = {
       return { data: stats, error: null };
     }
 
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       return { data: MockCivicStore.getStats(), error: null };
     }
 
@@ -179,8 +179,18 @@ export const complaintsService = {
 
       if (selectError) {
         return {
-          data: MockCivicStore.getStats(),
-          error: null,
+          data: {
+            total: 0,
+            reported: 0,
+            in_progress: 0,
+            resolved: 0,
+            rejected: 0,
+            critical: 0,
+            overdue: 0,
+            average_resolution_hours: null,
+            department_counts: {},
+          },
+          error: selectError,
         };
       }
 
@@ -216,10 +226,20 @@ export const complaintsService = {
       }
 
       return { data: stats, error: null };
-    } catch (err: any) {
+    } catch (err) {
       return {
-        data: MockCivicStore.getStats(),
-        error: null,
+        data: {
+          total: 0,
+          reported: 0,
+          in_progress: 0,
+          resolved: 0,
+          rejected: 0,
+          critical: 0,
+          overdue: 0,
+          average_resolution_hours: null,
+          department_counts: {},
+        },
+        error: err instanceof Error ? err : new Error(String(err)),
       };
     }
   },
@@ -286,7 +306,7 @@ export const complaintsService = {
       return { data: paginated, totalCount, page, pageSize, totalPages, error: null };
     }
 
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       let list = [...MockCivicStore.getComplaints()];
 
       if (category && category !== 'all') {
@@ -425,7 +445,7 @@ export const complaintsService = {
    * Fetch all open complaints for Map View (status = reported | in_progress)
    */
   async getOpenComplaintsForMap(): Promise<{ data: Complaint[]; error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const all = MockCivicStore.getComplaints();
       const open = all.filter((c) => c.status === 'reported' || c.status === 'in_progress');
       return { data: open, error: null };
@@ -439,12 +459,12 @@ export const complaintsService = {
         .order('created_at', { ascending: false });
 
       if (error) {
-        return { data: MockCivicStore.getComplaints().filter((c) => c.status !== 'rejected'), error: null };
+        return { data: [], error };
       }
 
       return { data: (data || []) as Complaint[], error: null };
-    } catch (err: any) {
-      return { data: MockCivicStore.getComplaints().filter((c) => c.status !== 'rejected'), error: null };
+    } catch (err) {
+      return { data: [], error: err instanceof Error ? err : new Error(String(err)) };
     }
   },
 
@@ -476,7 +496,7 @@ export const complaintsService = {
    * Fetch all complaints created by a specific user (My Complaints)
    */
   async getUserComplaints(userId: string): Promise<{ data: Complaint[]; error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const all = MockCivicStore.getComplaints();
       const userComplaints = all.filter((c) => c.user_id === userId || userId.startsWith('demo-'));
       return { data: userComplaints, error: null };
@@ -490,12 +510,12 @@ export const complaintsService = {
         .order('created_at', { ascending: false });
 
       if (error) {
-        return { data: MockCivicStore.getComplaints(), error: null };
+        return { data: [], error };
       }
 
       return { data: (data || []) as Complaint[], error: null };
-    } catch (err: any) {
-      return { data: MockCivicStore.getComplaints(), error: null };
+    } catch (err) {
+      return { data: [], error: err instanceof Error ? err : new Error(String(err)) };
     }
   },
 
@@ -503,7 +523,7 @@ export const complaintsService = {
    * Fetch a single complaint by ID with relations
    */
   async getComplaintById(id: string): Promise<{ data: Complaint | null; error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const all = MockCivicStore.getComplaints();
       const found = all.find((c) => c.id === id) || null;
       return { data: found, error: null };
@@ -517,14 +537,12 @@ export const complaintsService = {
         .maybeSingle();
 
       if (error) {
-        const fallback = MockCivicStore.getComplaints().find((c) => c.id === id) || null;
-        return { data: fallback, error: null };
+        return { data: null, error };
       }
 
       return { data: data as Complaint | null, error: null };
-    } catch (err: any) {
-      const fallback = MockCivicStore.getComplaints().find((c) => c.id === id) || null;
-      return { data: fallback, error: null };
+    } catch (err) {
+      return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
     }
   },
 
@@ -537,7 +555,7 @@ export const complaintsService = {
       return { data: updatesMap[complaintId] || [], error: null };
     }
 
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const updatesMap = MockCivicStore.getUpdates();
       return { data: updatesMap[complaintId] || [], error: null };
     }
@@ -550,14 +568,12 @@ export const complaintsService = {
         .order('created_at', { ascending: true });
 
       if (error) {
-        const updatesMap = MockCivicStore.getUpdates();
-        return { data: updatesMap[complaintId] || [], error: null };
+        return { data: [], error };
       }
 
       return { data: (data || []) as ComplaintUpdate[], error: null };
-    } catch (err: any) {
-      const updatesMap = MockCivicStore.getUpdates();
-      return { data: updatesMap[complaintId] || [], error: null };
+    } catch (err) {
+      return { data: [], error: err instanceof Error ? err : new Error(String(err)) };
     }
   },
 
@@ -566,7 +582,7 @@ export const complaintsService = {
       return { data: [DEMO_GOVERNMENT_PROFILE], error: null };
     }
 
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       return { data: Object.values(MockCivicStore.getProfiles()).filter((profile) => profile.role === 'admin'), error: null };
     }
 
@@ -591,7 +607,7 @@ export const complaintsService = {
     if (complaints.length === 0) return { data: {}, error: null };
 
     let candidates: Array<Pick<Complaint, 'id' | 'category' | 'latitude' | 'longitude'>>;
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       candidates = MockCivicStore.getComplaints();
     } else {
       const latitudeDelta = SIMILAR_REPORT_RADIUS_METERS / 111_320;
@@ -633,7 +649,7 @@ export const complaintsService = {
       return { data, error: null };
     }
 
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const now = Date.now();
       const data = MockCivicStore.getComplaints()
         .filter((complaint) => ['reported', 'in_progress'].includes(complaint.status))
@@ -654,7 +670,7 @@ export const complaintsService = {
   },
 
   async updateAdminAssignment(input: AdminAssignmentInput): Promise<{ data: Complaint | null; error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const complaints = MockCivicStore.getComplaints();
       const index = complaints.findIndex((complaint) => complaint.id === input.complaintId);
       if (index < 0) return { data: null, error: new Error('Complaint not found') };
@@ -717,7 +733,7 @@ export const complaintsService = {
    * Create a new complaint (Report Issue)
    */
   async createComplaint(input: CreateComplaintInput): Promise<{ data: Complaint | null; error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const profiles = MockCivicStore.getProfiles();
       const authorProfile = profiles[input.userId] || DEMO_PROFILES['demo-citizen-id'];
 
@@ -781,7 +797,7 @@ export const complaintsService = {
     userId: string,
     updates: UpdateComplaintInput
   ): Promise<{ data: Complaint | null; error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const complaints = MockCivicStore.getComplaints();
       const index = complaints.findIndex((c) => c.id === complaintId);
       if (index === -1) return { data: null, error: new Error('Complaint not found') };
@@ -872,7 +888,7 @@ export const complaintsService = {
       return { data: updatedComplaint, error: null };
     }
 
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const complaints = MockCivicStore.getComplaints();
       const index = complaints.findIndex((c) => c.id === input.complaintId);
       if (index === -1) return { data: null, error: new Error('Complaint not found') };
@@ -948,7 +964,7 @@ export const complaintsService = {
       return { data: null, error: new Error('Resolution feedback must be 1000 characters or fewer.') };
     }
 
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const complaints = MockCivicStore.getComplaints();
       const index = complaints.findIndex((complaint) => complaint.id === complaintId && complaint.user_id === userId);
       if (index < 0) return { data: null, error: new Error('Complaint not found or not owned by this citizen.') };
@@ -999,7 +1015,7 @@ export const complaintsService = {
    * Citizen deletes own complaint (only allowed when status is 'reported')
    */
   async deleteComplaint(complaintId: string, userId: string): Promise<{ error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const complaints = MockCivicStore.getComplaints();
       const complaint = complaints.find((item) => item.id === complaintId);
       if (!complaint || complaint.user_id !== userId || complaint.status !== 'reported' || complaint.resolution_confirmation_status === 'disputed') {
@@ -1055,7 +1071,7 @@ export const complaintsService = {
    * Add an upvote to a complaint
    */
   async addUpvote(complaintId: string, userId: string): Promise<{ error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const upvotes = MockCivicStore.getUpvotes();
       if (!upvotes.some((u) => u.complaint_id === complaintId && u.user_id === userId)) {
         upvotes.push({
@@ -1092,7 +1108,7 @@ export const complaintsService = {
    * Remove an upvote from a complaint
    */
   async removeUpvote(complaintId: string, userId: string): Promise<{ error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       let upvotes = MockCivicStore.getUpvotes();
       upvotes = upvotes.filter((u) => !(u.complaint_id === complaintId && u.user_id === userId));
       MockCivicStore.saveUpvotes(upvotes);
@@ -1127,7 +1143,7 @@ export const complaintsService = {
     complaintId: string,
     userId: string
   ): Promise<{ hasUpvoted: boolean; error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const upvotes = MockCivicStore.getUpvotes();
       const exists = upvotes.some((u) => u.complaint_id === complaintId && u.user_id === userId);
       return { hasUpvoted: exists, error: null };
@@ -1155,7 +1171,7 @@ export const complaintsService = {
    * Get all complaint IDs upvoted by the user in one efficient query
    */
   async getUserUpvotedIds(userId: string): Promise<{ data: string[]; error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const upvotes = MockCivicStore.getUpvotes();
       const ids = upvotes.filter((u) => u.user_id === userId).map((u) => u.complaint_id);
       return { data: ids, error: null };

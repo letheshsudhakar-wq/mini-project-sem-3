@@ -15,6 +15,7 @@ import { ComplaintCard } from '../components/ComplaintCard';
 import { useToast } from '../contexts/ToastContext';
 import { nativeService } from '../services/nativeService';
 import type { Complaint, ComplaintStatus } from '../types';
+import { useLanguage } from '../i18n';
 
 type FilterStatus = 'all' | ComplaintStatus;
 type SortOrder = 'newest' | 'oldest' | 'most_upvoted';
@@ -22,6 +23,7 @@ type SortOrder = 'newest' | 'oldest' | 'most_upvoted';
 export const ComplaintsPage: React.FC = () => {
   const { user } = useAuth();
   const { info, error } = useToast();
+  const { t } = useLanguage();
 
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -40,17 +42,17 @@ export const ComplaintsPage: React.FC = () => {
     try {
       const { data, error: fetchErr } = await complaintsService.getUserComplaints(user.id);
       if (fetchErr) {
-        setErrorMsg('Unable to retrieve your complaints. Please check your connection and try again.');
-        if (isManualRefresh) error('Failed to refresh complaints list.');
+        setErrorMsg(t('complaints.fetchError'));
+        if (isManualRefresh) error(t('complaints.refreshError'));
       } else {
         setComplaints(data || []);
         if (isManualRefresh) {
           nativeService.triggerHaptic('success');
-          info('Complaints refreshed');
+          info(t('complaints.refreshed'));
         }
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Unexpected error fetching your complaints.');
+      setErrorMsg(err?.message || t('complaints.unexpectedError'));
     } finally {
       setIsLoading(false);
     }
@@ -116,13 +118,13 @@ export const ComplaintsPage: React.FC = () => {
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
             <Inbox className="w-3.5 h-3.5" />
-            Citizen Grievance Records
+            {t('complaints.badge')}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-            My Complaints
+            {t('screen.complaints')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500">
-            Track resolution status, edit unresolved reports, and monitor updates for your submitted grievances.
+            {t('complaints.description')}
           </p>
         </div>
 
@@ -132,7 +134,7 @@ export const ComplaintsPage: React.FC = () => {
           className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-4 py-3 rounded-2xl shadow-sm transition active:scale-95 shrink-0"
         >
           <PlusCircle className="w-4 h-4" />
-          Report New Issue
+          {t('complaints.reportNew')}
         </Link>
       </div>
 
@@ -140,13 +142,13 @@ export const ComplaintsPage: React.FC = () => {
       <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
         {/* Status Tab Pills with no-scrollbar */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar text-xs font-semibold -mx-1 px-1">
-          {[
-            { key: 'all', label: 'All' },
-            { key: 'reported', label: 'Reported' },
-            { key: 'in_progress', label: 'In Progress' },
-            { key: 'resolved', label: 'Resolved' },
-            { key: 'rejected', label: 'Rejected' },
-          ].map((tab) => {
+          {([
+            { key: 'all', label: 'complaints.all' },
+            { key: 'reported', label: 'complaints.reported' },
+            { key: 'in_progress', label: 'complaints.inProgress' },
+            { key: 'resolved', label: 'complaints.resolved' },
+            { key: 'rejected', label: 'complaints.rejected' },
+          ] as const).map((tab) => {
             const isSelected = statusFilter === tab.key;
             return (
               <button
@@ -162,7 +164,7 @@ export const ComplaintsPage: React.FC = () => {
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-slate-50'
                 }`}
               >
-                <span>{tab.label}</span>
+                <span>{t(tab.label)}</span>
                 <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                   isSelected ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-600'
                 }`}>
@@ -181,7 +183,7 @@ export const ComplaintsPage: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by description, category, address..."
+              placeholder={t('complaints.searchPlaceholder')}
               className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
             />
             {searchQuery && (
@@ -189,7 +191,7 @@ export const ComplaintsPage: React.FC = () => {
                 type="button"
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
-                aria-label="Clear search"
+                aria-label={t('complaints.clearSearch')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -206,16 +208,16 @@ export const ComplaintsPage: React.FC = () => {
                 }}
                 className="w-full sm:w-auto px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
               >
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="most_upvoted">Most Upvoted</option>
+                <option value="newest">{t('complaints.sortNewest')}</option>
+                <option value="oldest">{t('complaints.sortOldest')}</option>
+                <option value="most_upvoted">{t('complaints.sortUpvoted')}</option>
               </select>
             </div>
 
             <button
               type="button"
               onClick={() => fetchMyComplaints(true)}
-              title="Refresh complaints list"
+              title={t('complaints.refreshTitle')}
               className="p-2.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-2xl border border-slate-200 transition shrink-0 active:scale-95 cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
@@ -236,7 +238,7 @@ export const ComplaintsPage: React.FC = () => {
             onClick={() => fetchMyComplaints(true)}
             className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-xs transition active:scale-95 cursor-pointer"
           >
-            Try Again
+            {t('complaints.tryAgain')}
           </button>
         </div>
       )}
@@ -276,12 +278,12 @@ export const ComplaintsPage: React.FC = () => {
 
           <div className="space-y-1 max-w-sm mx-auto">
             <h3 className="text-base sm:text-lg font-bold text-slate-900">
-              {complaints.length === 0 ? 'No complaints yet' : 'No matching complaints found'}
+              {complaints.length === 0 ? t('complaints.emptyTitle') : t('complaints.noMatchesTitle')}
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
               {complaints.length === 0
-                ? 'Have you noticed a civic issue in your area? Submit a grievance report to alert your local authorities.'
-                : 'Try adjusting your filters or search keywords to find what you are looking for.'}
+                ? t('complaints.emptyDescription')
+                : t('complaints.noMatchesDescription')}
             </p>
           </div>
 
@@ -293,7 +295,7 @@ export const ComplaintsPage: React.FC = () => {
                 className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-5 py-3 rounded-2xl shadow-sm transition active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
-                Report an Issue
+                {t('complaints.reportIssue')}
               </Link>
             </div>
           ) : (
@@ -305,7 +307,7 @@ export const ComplaintsPage: React.FC = () => {
               }}
               className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
             >
-              Clear filters
+              {t('complaints.clearFilters')}
             </button>
           )}
         </div>

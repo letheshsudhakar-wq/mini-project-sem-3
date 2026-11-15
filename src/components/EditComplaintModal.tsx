@@ -18,6 +18,7 @@ import { complaintsService } from '../services/complaints';
 import { nativeService } from '../services/nativeService';
 import { useAuth } from '../hooks/useAuth';
 import type { Complaint, ComplaintCategory } from '../types';
+import { useLanguage } from '../i18n';
 
 interface EditComplaintModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export const EditComplaintModal: React.FC<EditComplaintModalProps> = ({
   onSaved,
 }) => {
   const { user } = useAuth();
+  const { language } = useLanguage();
 
   const [category, setCategory] = useState<ComplaintCategory>(complaint.category);
   const [description, setDescription] = useState(complaint.description);
@@ -79,14 +81,14 @@ export const EditComplaintModal: React.FC<EditComplaintModalProps> = ({
 
     setIsGeocoding(true);
     try {
-      const result = await reverseGeocode(lat, lng, geocodeAbortRef.current.signal);
+      const result = await reverseGeocode(lat, lng, geocodeAbortRef.current.signal, language);
       setAddress(result.address);
     } catch {
       setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
     } finally {
       setIsGeocoding(false);
     }
-  }, []);
+  }, [language]);
 
   const handleLocationChange = (coords: { lat: number; lng: number }) => {
     setLatitude(coords.lat);

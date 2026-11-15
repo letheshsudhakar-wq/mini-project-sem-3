@@ -10,6 +10,7 @@ import {
   Route
 } from 'lucide-react';
 import type { ComplaintCategory } from '../types';
+import { translateCategory, useLanguage } from '../i18n';
 
 interface CategoryLegendProps {
   counts?: Record<string, number>;
@@ -74,19 +75,21 @@ export const CategoryLegend: React.FC<CategoryLegendProps> = ({
   onSelectCategory,
   className = '',
 }) => {
+  const { t } = useLanguage();
+
   return (
     <div className={`bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-2.5 ${className}`}>
       <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
         <span className="flex items-center gap-1.5 text-slate-700">
           <Layers className="w-3.5 h-3.5 text-blue-600" />
-          Map Category Legend
+          {t('map.legend')}
         </span>
         {onSelectCategory && selectedCategory !== 'all' && (
           <button
             onClick={() => onSelectCategory('all')}
             className="text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer lowercase"
           >
-            reset
+            {t('map.reset')}
           </button>
         )}
       </div>
@@ -109,7 +112,7 @@ export const CategoryLegend: React.FC<CategoryLegendProps> = ({
             >
               <div className="flex items-center gap-1.5 truncate">
                 {item.icon}
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">{translateCategory(item.category, t, item.label)}</span>
               </div>
               {count !== null && (
                 <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-white/70 text-slate-800 font-bold shrink-0">

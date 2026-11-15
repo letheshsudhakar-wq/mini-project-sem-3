@@ -5,6 +5,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { RootLayout } from './layouts/RootLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
+import { LanguageProvider } from './i18n';
 
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -15,41 +16,45 @@ import { ComplaintDetailPage } from './pages/ComplaintDetailPage';
 import { MapPage } from './pages/MapPage';
 import { AdminPage } from './pages/AdminPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <ToastProvider>
-        <BrowserRouter>
-          <Routes>
-          <Route path="/" element={<RootLayout />}>
-            {/* Public Access Routes */}
-            <Route index element={<HomePage />} />
-            <Route path="login" element={<LoginPage />} />
-            <Route path="government/login" element={<LoginPage />} />
-            <Route path="signup" element={<SignupPage />} />
+      <LanguageProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<RootLayout />}>
+                {/* Public Access Routes */}
+                <Route index element={<HomePage />} />
+                <Route path="login" element={<LoginPage />} />
+                <Route path="government/login" element={<LoginPage />} />
+                <Route path="signup" element={<SignupPage />} />
+                <Route path="auth/callback" element={<AuthCallbackPage />} />
 
-            {/* Citizen-only routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="complaints" element={<ComplaintsPage />} />
-              <Route path="complaints/:id" element={<ComplaintDetailPage />} />
-              <Route path="report" element={<ReportPage />} />
-              <Route path="map" element={<MapPage />} />
-            </Route>
+                {/* Citizen-only routes */}
+                <Route element={<ProtectedRoute />}>
+                  <Route path="complaints" element={<ComplaintsPage />} />
+                  <Route path="complaints/:id" element={<ComplaintDetailPage />} />
+                  <Route path="report" element={<ReportPage />} />
+                  <Route path="map" element={<MapPage />} />
+                </Route>
 
-            {/* Admin Only Routes */}
-            <Route element={<AdminRoute />}>
-              <Route path="government" element={<AdminPage />} />
-              <Route path="admin" element={<AdminPage />} />
-            </Route>
+                {/* Admin Only Routes */}
+                <Route element={<AdminRoute />}>
+                  <Route path="government" element={<AdminPage />} />
+                  <Route path="admin" element={<AdminPage />} />
+                </Route>
 
-            {/* 404 Fallback */}
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </ToastProvider>
-  </AuthProvider>
+                {/* 404 Fallback */}
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
+      </LanguageProvider>
+    </AuthProvider>
   );
 };
 

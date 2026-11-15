@@ -1,3 +1,5 @@
+import type { TranslationKey } from '../i18n';
+
 /**
  * Formats Supabase and network errors into clean, user-friendly messages.
  */
@@ -36,4 +38,22 @@ export function formatAuthError(error: any): string {
   }
 
   return message || 'An error occurred during authentication. Please try again.';
+}
+
+export function localizeAuthError(
+  error: unknown,
+  translate: (key: TranslationKey) => string
+): string {
+  const message = formatAuthError(error);
+  const lower = message.toLowerCase();
+
+  if (lower.includes('invalid email address or password')) return translate('auth.errorInvalidCredentials');
+  if (lower.includes('account with this email address already exists')) return translate('auth.errorAccountExists');
+  if (lower.includes('password is too weak')) return translate('auth.errorWeakPassword');
+  if (lower.includes('email has not been verified')) return translate('auth.errorEmailUnverified');
+  if (lower.includes('too many login attempts')) return translate('auth.errorRateLimit');
+  if (lower.includes('unable to reach the server')) return translate('auth.errorNetwork');
+  if (message === 'An unexpected error occurred. Please try again.') return translate('auth.errorGeneric');
+
+  return message;
 }

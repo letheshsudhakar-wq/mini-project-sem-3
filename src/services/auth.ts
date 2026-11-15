@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { getSupabaseClient } from '../lib/supabase';
 import type { Profile } from '../types';
 
 export const authService = {
@@ -6,6 +6,7 @@ export const authService = {
    * Get current authenticated user session
    */
   async getCurrentSession() {
+    const supabase = getSupabaseClient();
     const { data: { session }, error } = await supabase.auth.getSession();
     return { session, error };
   },
@@ -14,6 +15,7 @@ export const authService = {
    * Get current user profile
    */
   async getProfile(userId: string) {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -27,6 +29,7 @@ export const authService = {
    * Update profile (name, phone)
    */
   async updateProfile(userId: string, updates: { name?: string; phone?: string }) {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('profiles')
       .update(updates)

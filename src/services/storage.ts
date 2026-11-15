@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { STORAGE_BUCKETS } from '../utils/constants';
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -15,7 +15,7 @@ export const storageService = {
    * Upload image to complaint-images bucket
    */
   async uploadComplaintImage(file: File, userId: string): Promise<{ url: string | null; error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       try {
         const dataUrl = await readFileAsDataUrl(file);
         return { url: dataUrl, error: null };
@@ -60,7 +60,7 @@ export const storageService = {
    * Upload image to resolution-images bucket (Admin)
    */
   async uploadResolutionImage(file: File, adminId: string): Promise<{ url: string | null; error: Error | null }> {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       try {
         const dataUrl = await readFileAsDataUrl(file);
         return { url: dataUrl, error: null };

@@ -11,9 +11,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { nativeService } from '../services/nativeService';
+import { useLanguage } from '../i18n';
 
 export const HomePage: React.FC = () => {
   const { user, profile, isAdmin } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const handleAction = (path: string) => {
@@ -28,13 +30,13 @@ export const HomePage: React.FC = () => {
         <div className="md:hidden p-4 rounded-3xl bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 text-white shadow-md flex items-center justify-between">
           <div className="space-y-0.5 min-w-0">
             <span className="text-[11px] font-bold uppercase tracking-wider text-blue-200">
-              Welcome back
+              {t('home.welcomeBack')}
             </span>
             <h2 className="text-base font-extrabold truncate">
               {profile?.name || user.email?.split('@')[0] || 'Citizen'}
             </h2>
             <p className="text-xs text-blue-100">
-              {isAdmin ? '🛡️ Admin Operations Active' : '📍 File and track neighborhood reports'}
+              {isAdmin ? `🛡️ ${t('home.adminActive')}` : `📍 ${t('home.fileAndTrack')}`}
             </p>
           </div>
           <button
@@ -42,7 +44,7 @@ export const HomePage: React.FC = () => {
             onClick={() => handleAction('/report')}
             className="px-3.5 py-2 bg-white text-blue-700 rounded-2xl text-xs font-bold shadow-sm active:scale-95 transition shrink-0"
           >
-            + Report
+            + {t('home.reportIssue')}
           </button>
         </div>
       )}
@@ -51,19 +53,19 @@ export const HomePage: React.FC = () => {
       <section className="text-center max-w-3xl mx-auto space-y-4 sm:space-y-6 pt-2 sm:pt-8">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200/80 shadow-2xs">
           <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-          Community-Driven Grievance Resolution Platform
+          {t('home.badge')}
         </div>
         
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight">
-          Report civic issues. <br className="hidden sm:inline" />
+          {t('home.titleFirst')} <br className="hidden sm:inline" />
           <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Track progress.
+            {t('home.titleSecond')}
           </span> <br />
-          Improve your community.
+          {t('home.titleThird')}
         </h1>
         
         <p className="text-xs sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
-          CivicFix empowers residents to flag neighborhood problems—such as potholes, broken streetlights, drainage overflows, and uncollected garbage—with real-time status tracking and transparent resolution.
+          {t('home.description')}
         </p>
 
         {/* Primary and Secondary CTAs */}
@@ -75,7 +77,7 @@ export const HomePage: React.FC = () => {
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm sm:text-base px-6 sm:px-7 py-3.5 rounded-2xl shadow-lg shadow-blue-500/25 transition-all duration-200 active:scale-[0.98] cursor-pointer"
           >
             <PlusCircle className="w-5 h-5" />
-            Report an Issue
+            {t('home.reportIssue')}
           </Link>
           <Link
             to={user ? "/complaints" : "/login"}
@@ -84,12 +86,12 @@ export const HomePage: React.FC = () => {
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-sm sm:text-base px-6 sm:px-7 py-3.5 rounded-2xl border border-slate-300 shadow-2xs transition-all duration-200 active:scale-[0.98] cursor-pointer"
           >
             <Search className="w-5 h-5 text-slate-500" />
-            Track Complaints
+            {t('home.trackComplaints')}
           </Link>
         </div>
 
         <p className="text-[11px] sm:text-xs text-slate-400">
-          CivicFix is an open community grievance management platform designed for civic transparency.
+          {t('home.tagline')}
         </p>
       </section>
 
@@ -105,9 +107,9 @@ export const HomePage: React.FC = () => {
           </div>
           <div>
             <div className="text-xs font-extrabold text-slate-900 group-hover:text-blue-700 transition">
-              File New Grievance
+              {t('home.newGrievance')}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">GPS location & photo</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{t('home.gpsPhoto')}</p>
           </div>
         </Link>
 
@@ -121,9 +123,9 @@ export const HomePage: React.FC = () => {
           </div>
           <div>
             <div className="text-xs font-extrabold text-slate-900 group-hover:text-amber-800 transition">
-              Live Area Map
+              {t('home.areaMap')}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">View nearby active pins</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{t('home.nearbyPins')}</p>
           </div>
         </Link>
 
@@ -137,9 +139,9 @@ export const HomePage: React.FC = () => {
           </div>
           <div>
             <div className="text-xs font-extrabold text-slate-900 group-hover:text-emerald-800 transition">
-              Track Status
+              {t('home.trackStatus')}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">Real-time audit history</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{t('home.auditHistory')}</p>
           </div>
         </Link>
       </section>
@@ -147,9 +149,9 @@ export const HomePage: React.FC = () => {
       {/* 3-Step Process: Report -> Track -> Resolve */}
       <section className="space-y-4 sm:space-y-8">
         <div className="text-center space-y-1 sm:space-y-2">
-          <h2 className="text-xl sm:text-3xl font-bold text-slate-900">How CivicFix Works</h2>
+          <h2 className="text-xl sm:text-3xl font-bold text-slate-900">{t('home.howItWorks')}</h2>
           <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto">
-            A transparent 3-step lifecycle ensuring neighborhood issues are heard and addressed.
+            {t('home.lifecycle')}
           </p>
         </div>
 
@@ -161,15 +163,15 @@ export const HomePage: React.FC = () => {
                 <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                   <ShieldAlert className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Step 1</span>
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full uppercase tracking-wider">{t('home.step1')}</span>
               </div>
-              <h3 className="text-base sm:text-lg font-bold text-slate-900">Report</h3>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">{t('home.report')}</h3>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Pinpoint issue locations via GPS or map marker, upload proof photos, and describe the civic problem. Nearby duplicate detection prevents redundant reports.
+                {t('home.reportDetails')}
               </p>
             </div>
             <div className="pt-2 text-[11px] font-medium text-slate-400 flex items-center gap-1.5 border-t border-slate-100">
-              <span>Geo-tagged & photo-verified</span>
+              <span>{t('home.geoVerified')}</span>
             </div>
           </div>
 
@@ -180,15 +182,15 @@ export const HomePage: React.FC = () => {
                 <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
                   <Clock className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Step 2</span>
+                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full uppercase tracking-wider">{t('home.step2')}</span>
               </div>
-              <h3 className="text-base sm:text-lg font-bold text-slate-900">Track</h3>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">{t('home.track')}</h3>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Follow real-time status updates from <span className="font-semibold text-amber-600">Reported</span> to <span className="font-semibold text-blue-600">In Progress</span> with an immutable timeline and community upvotes.
+                {t('home.trackDetails').replace('Reported', t('home.reported')).replace('In Progress', t('home.inProgress'))}
               </p>
             </div>
             <div className="pt-2 text-[11px] font-medium text-slate-400 flex items-center gap-1.5 border-t border-slate-100">
-              <span>Live timeline & upvoting</span>
+              <span>{t('home.timeline')}</span>
             </div>
           </div>
 
@@ -199,15 +201,15 @@ export const HomePage: React.FC = () => {
                 <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
                   <CheckCircle2 className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Step 3</span>
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider">{t('home.step3')}</span>
               </div>
-              <h3 className="text-base sm:text-lg font-bold text-slate-900">Resolve</h3>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">{t('home.resolve')}</h3>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Municipal teams and administrators mark issues as <span className="font-semibold text-emerald-600">Resolved</span>, attach resolution proof photos, and provide notes for full closure accountability.
+                {t('home.resolveDetails').replace('Resolved', t('home.resolved'))}
               </p>
             </div>
             <div className="pt-2 text-[11px] font-medium text-slate-400 flex items-center gap-1.5 border-t border-slate-100">
-              <span>Resolution photo verification</span>
+              <span>{t('home.resolutionProof')}</span>
             </div>
           </div>
         </div>
@@ -219,13 +221,13 @@ export const HomePage: React.FC = () => {
         <div className="max-w-3xl space-y-3 sm:space-y-4 relative z-10">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-blue-400 text-xs font-semibold">
             <MapPin className="w-3.5 h-3.5" />
-            Interactive Public Map
+            {t('home.publicMap')}
           </div>
           <h2 className="text-xl sm:text-3xl font-bold">
-            Explore Open Grievances in Your Area
+            {t('home.exploreTitle')}
           </h2>
           <p className="text-slate-300 text-xs sm:text-base leading-relaxed">
-            Use the interactive CivicFix map to discover active complaints within 500 meters of your location, filter by category (pothole, streetlight, drainage, garbage), and upvote issues that affect you.
+            {t('home.exploreDescription')}
           </p>
           <div className="pt-2">
             <Link
@@ -234,7 +236,7 @@ export const HomePage: React.FC = () => {
               onClick={() => nativeService.triggerHaptic('light')}
               className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 rounded-xl transition shadow-md text-xs sm:text-sm active:scale-95"
             >
-              Open Civic Map
+              {t('home.openMap')}
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -244,8 +246,8 @@ export const HomePage: React.FC = () => {
       {/* Grievance Categories Section */}
       <section className="space-y-4 sm:space-y-6">
         <div className="text-center space-y-1">
-          <h2 className="text-lg sm:text-2xl font-bold text-slate-900">Common Issue Categories</h2>
-          <p className="text-xs sm:text-sm text-slate-500">Tap a category to quickly start reporting</p>
+          <h2 className="text-lg sm:text-2xl font-bold text-slate-900">{t('home.categoriesTitle')}</h2>
+          <p className="text-xs sm:text-sm text-slate-500">{t('home.categoriesDescription')}</p>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
@@ -254,9 +256,9 @@ export const HomePage: React.FC = () => {
             onClick={() => nativeService.triggerHaptic('light')}
             className="p-4 rounded-3xl bg-white border border-slate-200 hover:border-orange-300 text-center space-y-1.5 transition shadow-2xs active:scale-95 block group"
           >
-            <span className="text-3xl block group-hover:scale-110 transition" role="img" aria-label="Pothole">🕳️</span>
-            <div className="font-bold text-slate-900 text-xs sm:text-sm">Potholes</div>
-            <p className="text-[11px] text-slate-500">Road craters, damaged pavement</p>
+            <span className="text-3xl block group-hover:scale-110 transition" role="img" aria-label={t('home.potholes')}>🕳️</span>
+            <div className="font-bold text-slate-900 text-xs sm:text-sm">{t('home.potholes')}</div>
+            <p className="text-[11px] text-slate-500">{t('home.potholeDescription')}</p>
           </Link>
 
           <Link
@@ -264,9 +266,9 @@ export const HomePage: React.FC = () => {
             onClick={() => nativeService.triggerHaptic('light')}
             className="p-4 rounded-3xl bg-white border border-slate-200 hover:border-amber-300 text-center space-y-1.5 transition shadow-2xs active:scale-95 block group"
           >
-            <span className="text-3xl block group-hover:scale-110 transition" role="img" aria-label="Streetlight">💡</span>
-            <div className="font-bold text-slate-900 text-xs sm:text-sm">Streetlights</div>
-            <p className="text-[11px] text-slate-500">Dark poles, flickering lamps</p>
+            <span className="text-3xl block group-hover:scale-110 transition" role="img" aria-label={t('home.streetlights')}>💡</span>
+            <div className="font-bold text-slate-900 text-xs sm:text-sm">{t('home.streetlights')}</div>
+            <p className="text-[11px] text-slate-500">{t('home.streetlightDescription')}</p>
           </Link>
 
           <Link
@@ -274,9 +276,9 @@ export const HomePage: React.FC = () => {
             onClick={() => nativeService.triggerHaptic('light')}
             className="p-4 rounded-3xl bg-white border border-slate-200 hover:border-sky-300 text-center space-y-1.5 transition shadow-2xs active:scale-95 block group"
           >
-            <span className="text-3xl block group-hover:scale-110 transition" role="img" aria-label="Drainage">🌊</span>
-            <div className="font-bold text-slate-900 text-xs sm:text-sm">Drainage</div>
-            <p className="text-[11px] text-slate-500">Blocked drains, waterlogging</p>
+            <span className="text-3xl block group-hover:scale-110 transition" role="img" aria-label={t('home.drainage')}>🌊</span>
+            <div className="font-bold text-slate-900 text-xs sm:text-sm">{t('home.drainage')}</div>
+            <p className="text-[11px] text-slate-500">{t('home.drainageDescription')}</p>
           </Link>
 
           <Link
@@ -284,9 +286,9 @@ export const HomePage: React.FC = () => {
             onClick={() => nativeService.triggerHaptic('light')}
             className="p-4 rounded-3xl bg-white border border-slate-200 hover:border-emerald-300 text-center space-y-1.5 transition shadow-2xs active:scale-95 block group"
           >
-            <span className="text-3xl block group-hover:scale-110 transition" role="img" aria-label="Garbage">🗑️</span>
-            <div className="font-bold text-slate-900 text-xs sm:text-sm">Garbage</div>
-            <p className="text-[11px] text-slate-500">Overflowing bins, illegal dumps</p>
+            <span className="text-3xl block group-hover:scale-110 transition" role="img" aria-label={t('home.garbage')}>🗑️</span>
+            <div className="font-bold text-slate-900 text-xs sm:text-sm">{t('home.garbage')}</div>
+            <p className="text-[11px] text-slate-500">{t('home.garbageDescription')}</p>
           </Link>
         </div>
       </section>

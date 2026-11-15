@@ -16,10 +16,11 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { formatAuthError } from '../utils/authErrors';
+import { formatAuthError, localizeAuthError } from '../utils/authErrors';
 import { nativeService } from '../services/nativeService';
 import { useToast } from '../contexts/ToastContext';
 import { CivicLogoIcon } from '../components/CivicLogo';
+import { useLanguage } from '../i18n';
 
 const GoogleIcon: React.FC = () => (
   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -45,6 +46,7 @@ const GoogleIcon: React.FC = () => (
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useLanguage();
   const isGovernmentLogin = location.pathname === '/government/login';
   const { success, error: toastError } = useToast();
   const { 
@@ -66,7 +68,11 @@ export const LoginPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(() =>
+    (location.state as { oauthError?: boolean } | null)?.oauthError
+      ? t('auth.googleSignInFailed')
+      : null
+  );
 
   const getDestinationPath = (userRole?: string | null) => {
     const from = (location.state as any)?.from?.pathname;
@@ -105,8 +111,8 @@ export const LoginPage: React.FC = () => {
     try {
       const { error } = await signInWithGoogle();
       if (error) {
-        setErrorMessage(formatAuthError(error));
-        toastError('Google sign in failed');
+        setErrorMessage(localizeAuthError(error, t));
+        toastError(t('auth.googleSignInFailed'));
         setIsGoogleSubmitting(false);
         return;
       }
@@ -115,7 +121,7 @@ export const LoginPage: React.FC = () => {
         navigate('/complaints', { replace: true });
       }
     } catch (err) {
-      setErrorMessage(formatAuthError(err));
+      setErrorMessage(localizeAuthError(err, t));
       setIsGoogleSubmitting(false);
     }
   };
@@ -124,11 +130,16 @@ export const LoginPage: React.FC = () => {
     setIsSigningOut(true);
     nativeService.triggerHaptic('medium');
     try {
-      await signOut();
+      const { error } = await signOut();
+      if (error) {
+        setErrorMessage(localizeAuthError(error, t));
+        toastError('Sign out failed');
+        return;
+      }
       setEmail('');
       setPassword('');
       setErrorMessage(null);
-      success('Signed out');
+      success(t('auth.signOut'));
     } catch (err) {
       console.error('Failed to sign out:', err);
     } finally {
@@ -142,12 +153,12 @@ export const LoginPage: React.FC = () => {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setErrorMessage('Please enter your email address.');
+      setErrorMessage(t('auth.emailRequired'));
       return;
     }
 
     if (!password) {
-      setErrorMessage('Please enter your password.');
+      setErrorMessage(t('auth.loginPasswordRequired'));
       return;
     }
 
@@ -161,12 +172,12 @@ export const LoginPage: React.FC = () => {
         const friendlyError = formatAuthError(error);
         if (isConfigured && friendlyError.toLowerCase().includes('invalid')) {
           setErrorMessage(
-            'Invalid credentials. If you have not created an account in your Supabase database yet, click "Create Account" below.'
+            t('auth.invalidCredentialsHelp')
           );
         } else {
-          setErrorMessage(friendlyError);
+          setErrorMessage(localizeAuthError(error, t));
         }
-        toastError('Authentication failed');
+        toastError(t('auth.loginFailed'));
         setIsSubmitting(false);
         return;
       }
@@ -175,7 +186,7 @@ export const LoginPage: React.FC = () => {
       const dest = getDestinationPath(assignedRole);
       navigate(dest, { replace: true });
     } catch (err) {
-      setErrorMessage(formatAuthError(err));
+      setErrorMessage(localizeAuthError(err, t));
     } finally {
       setIsSubmitting(false);
     }
@@ -189,20 +200,20 @@ export const LoginPage: React.FC = () => {
           <div className="flex justify-center">
             <CivicLogoIcon size="lg" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Sign In to CivicFix</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">{t('auth.signInTitle')}</h1>
           <p className="text-xs sm:text-sm text-slate-300">
             {isGovernmentLogin
-              ? 'Access the municipal complaint operations dashboard'
-              : 'Access your civic grievance reports, upvotes, and status updates'}
+              ? t('auth.governmentDescription')
+              : t('auth.citizenDescription')}
           </p>
 
           {isGovernmentLogin && (
             <div className="rounded-xl border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-left text-[11px] text-amber-100">
               <div className="mb-1 flex items-center gap-2 font-bold uppercase tracking-wide text-amber-200">
                 <ShieldAlert className="h-3.5 w-3.5" />
-                Demo Government Access
+                {t('auth.demoGovernmentAccess')}
               </div>
-              <div>For presentation/testing only.</div>
+              <div>{t('auth.forTestingOnly')}</div>
             </div>
           )}
 
@@ -211,12 +222,12 @@ export const LoginPage: React.FC = () => {
             {isDemoMode ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-400/20 border border-amber-400/30 text-amber-200">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                Demo Mode Active
+                {t('auth.demoMode')}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-400/20 border border-emerald-400/30 text-emerald-200">
                 <Check className="w-3.5 h-3.5 text-emerald-300" />
-                Supabase Live Connected
+                {t('auth.liveConnected')}
               </span>
             )}
           </div>
@@ -237,7 +248,7 @@ export const LoginPage: React.FC = () => {
                       {profile?.name || user.email}
                     </p>
                     <p className="text-[10px] uppercase font-bold text-blue-700 tracking-wider">
-                      Currently Signed In ({role || (isAdmin ? 'Admin' : 'Citizen')})
+                      {t('auth.currentlySignedIn', { role: role || (isAdmin ? t('nav.government') : t('nav.citizen')) })}
                     </p>
                   </div>
                 </div>
@@ -247,25 +258,25 @@ export const LoginPage: React.FC = () => {
                   onClick={handleSignOutCurrent}
                   disabled={isSigningOut}
                   className="px-2.5 py-1 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                  title="Sign out of current account"
+                  title={t('auth.signOut')}
                 >
                   {isSigningOut ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
                   ) : (
                     <LogOut className="w-3 h-3" />
                   )}
-                  <span>Sign Out</span>
+                  <span>{t('auth.signOut')}</span>
                 </button>
               </div>
 
               <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between gap-2">
-                <span className="text-[11px] text-slate-600">Already signed in.</span>
+                <span className="text-[11px] text-slate-600">{t('auth.alreadySignedIn')}</span>
                 <button
                   type="button"
                   onClick={() => navigate(getDestinationPath(role), { replace: true })}
                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
                 >
-                  <span>Go to {isAdmin ? 'Government Dashboard' : 'Complaints'}</span>
+                  <span>{isAdmin ? t('auth.goToGovernment') : t('auth.goToComplaints')}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -297,7 +308,7 @@ export const LoginPage: React.FC = () => {
               ) : (
                 <GoogleIcon />
               )}
-              <span>Continue with Google</span>
+              <span>{t('auth.continueGoogle')}</span>
             </button>
           </div>
 
@@ -308,7 +319,7 @@ export const LoginPage: React.FC = () => {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-white px-2.5 text-slate-400 font-bold tracking-wider text-[10px]">
-                Or email & password
+                {t('auth.orEmailPassword')}
               </span>
             </div>
           </div>
@@ -320,7 +331,7 @@ export const LoginPage: React.FC = () => {
                 htmlFor="login-email" 
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
               >
-                Email Address <span className="text-rose-500">*</span>
+                {t('auth.email')} <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
@@ -347,7 +358,7 @@ export const LoginPage: React.FC = () => {
                   htmlFor="login-password" 
                   className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
                 >
-                  Password <span className="text-rose-500">*</span>
+                  {t('auth.password')} <span className="text-rose-500">*</span>
                 </label>
               </div>
               <div className="relative">
@@ -369,7 +380,7 @@ export const LoginPage: React.FC = () => {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-slate-600 focus:outline-none transition cursor-pointer"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -386,12 +397,12 @@ export const LoginPage: React.FC = () => {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Signing In...</span>
+                  <span>{t('auth.signingIn')}</span>
                 </>
               ) : (
                 <>
                   <LogIn className="w-4 h-4" />
-                  <span>Sign In</span>
+                  <span>{t('auth.submitSignIn')}</span>
                   <ArrowRight className="w-4 h-4 ml-1 opacity-70" />
                 </>
               )}
@@ -402,18 +413,18 @@ export const LoginPage: React.FC = () => {
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center gap-2.5">
             <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
             <span>
-              Citizens are routed to <strong>Complaints</strong> and Admins are routed to <strong>Admin Console</strong> automatically.
+              {t('auth.roleRouting')}
             </span>
           </div>
 
           {/* Footer Link to Signup */}
           <div className="pt-2 border-t border-slate-100 text-center text-xs text-slate-500">
-            Don't have a citizen account yet?{' '}
+            {t('auth.noAccount')}{' '}
             <Link 
               to="/signup" 
               className="font-bold text-blue-600 hover:text-blue-700 hover:underline transition"
             >
-              Create Account
+              {t('auth.createAccount')}
             </Link>
           </div>
         </div>

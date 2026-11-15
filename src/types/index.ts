@@ -13,6 +13,7 @@ export type ComplaintCategory = 'pothole' | 'streetlight' | 'drainage' | 'garbag
 export type ComplaintStatus = 'reported' | 'in_progress' | 'resolved' | 'rejected';
 export type ComplaintPriority = 'low' | 'normal' | 'high' | 'critical';
 export type ResolutionConfirmationStatus = 'pending' | 'confirmed' | 'disputed';
+export type PreferredLanguage = 'en' | 'hi' | 'kn' | 'ta';
 
 export interface Profile {
   id: string;
@@ -22,6 +23,7 @@ export interface Profile {
   role: UserRole;
   department?: string | null;
   ward?: string | null;
+  preferred_language?: PreferredLanguage;
   created_at: string;
 }
 
@@ -103,6 +105,7 @@ export interface Database {
           email: string | null;
           phone: string | null;
           role: UserRole;
+          preferred_language: PreferredLanguage;
           created_at: string;
         };
         Insert: {
@@ -111,6 +114,7 @@ export interface Database {
           email?: string | null;
           phone?: string | null;
           role?: UserRole;
+          preferred_language?: PreferredLanguage;
           created_at?: string;
         };
         Update: {
@@ -119,6 +123,7 @@ export interface Database {
           email?: string | null;
           phone?: string | null;
           role?: UserRole;
+          preferred_language?: PreferredLanguage;
           created_at?: string;
         };
         Relationships: [

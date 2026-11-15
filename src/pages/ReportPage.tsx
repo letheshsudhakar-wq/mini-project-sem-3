@@ -30,6 +30,7 @@ import { nativeService } from '../services/nativeService';
 import { aiService, type AIAssessmentResult } from '../services/aiService';
 import { useToast } from '../contexts/ToastContext';
 import type { ComplaintCategory, NearbyComplaint, Complaint } from '../types';
+import { translateCategory, translateCategoryDescription, useLanguage } from '../i18n';
 
 // Default initial coordinates (Fallback to a central location: e.g. New Delhi / NYC central)
 const DEFAULT_LATITUDE = 28.6139;
@@ -37,6 +38,7 @@ const DEFAULT_LONGITUDE = 77.2090;
 
 export const ReportPage: React.FC = () => {
   const { user } = useAuth();
+  const { language, t } = useLanguage();
   const { success, error: toastError, warning, info } = useToast();
 
   // Form States
@@ -80,21 +82,20 @@ export const ReportPage: React.FC = () => {
 
   // Auto-fetch reverse geocoding when coordinates change
   const fetchAddress = useCallback(async (lat: number, lng: number) => {
-    if (geocodeAbortRef.current) {
-      geocodeAbortRef.current.abort();
-    }
-    geocodeAbortRef.current = new AbortController();
+    geocodeAbortRef.current?.abort();
+    const controller = new AbortController();
+    geocodeAbortRef.current = controller;
 
     setIsGeocoding(true);
     try {
-      const result = await reverseGeocode(lat, lng, geocodeAbortRef.current.signal);
-      setAddress(result.address);
+      const result = await reverseGeocode(lat, lng, controller.signal, language);
+      if (!controller.signal.aborted) setAddress(result.address);
     } catch {
-      setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+      if (!controller.signal.aborted) setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
     } finally {
-      setIsGeocoding(false);
+      if (geocodeAbortRef.current === controller) setIsGeocoding(false);
     }
-  }, []);
+  }, [language]);
 
   // Update position manually from map
   const handleLocationChange = (coords: { lat: number; lng: number }) => {
@@ -130,9 +131,11 @@ export const ReportPage: React.FC = () => {
 
   // Initial geocoding & optional GPS check on mount
   useEffect(() => {
+    let isMounted = true;
     fetchAddress(DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
     nativeService.getCurrentLocation().then(
       (pos) => {
+        if (!isMounted) return;
         setLatitude(pos.latitude);
         setLongitude(pos.longitude);
         fetchAddress(pos.latitude, pos.longitude);
@@ -141,6 +144,10 @@ export const ReportPage: React.FC = () => {
         // Silent fallback on initial load
       }
     );
+    return () => {
+      isMounted = false;
+      geocodeAbortRef.current?.abort();
+    };
   }, [fetchAddress]);
 
   // AI-Assisted Text Analysis
@@ -173,7 +180,7 @@ export const ReportPage: React.FC = () => {
     if (aiAssessment?.suggestedCategory) {
       nativeService.triggerHaptic('light');
       setCategory(aiAssessment.suggestedCategory);
-      success(`Applied category: ${COMPLAINT_CATEGORIES.find(c => c.value === aiAssessment.suggestedCategory)?.label}`);
+      success(`${t('report.category')}: ${translateCategory(aiAssessment.suggestedCategory, t, aiAssessment.suggestedCategory)}`);
     }
   };
 
@@ -390,7 +397,7 @@ export const ReportPage: React.FC = () => {
     navigator.clipboard.writeText(submittedComplaint.id);
     setCopiedId(true);
     nativeService.triggerHaptic('light');
-    info('Tracking ID copied');
+    info(t('report.copied'));
     setTimeout(() => setCopiedId(false), 2000);
   };
 
@@ -408,9 +415,9 @@ export const ReportPage: React.FC = () => {
             <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center mx-auto shadow-inner border border-white/30">
               <CheckCircle2 className="w-9 h-9 text-white" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Grievance Submitted</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">{t('report.submitted')}</h1>
             <p className="text-emerald-100 text-xs sm:text-sm max-w-md mx-auto">
-              Your civic report has been securely registered in the municipal database and assigned for review.
+              {t('report.submittedDescription')}
             </p>
           </div>
 
@@ -419,7 +426,7 @@ export const ReportPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Tracking ID
+                  {t('report.trackingId')}
                 </span>
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-mono font-bold text-slate-800 truncate">
@@ -681,7 +688,7 @@ export const ReportPage: React.FC = () => {
             <div className="bg-white p-5 sm:p-7 rounded-3xl border border-slate-200 shadow-2xs space-y-5">
               <h2 className="text-sm sm:text-base font-extrabold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</span>
-                Issue Details & Photos
+                {t('report.formTitle')}
               </h2>
 
               {/* Category Selector */}
@@ -690,7 +697,7 @@ export const ReportPage: React.FC = () => {
                   htmlFor="report-category" 
                   className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
                 >
-                  Category <span className="text-rose-500">*</span>
+                  {t('report.category')} <span className="text-rose-500">*</span>
                 </label>
                 <select
                   id="report-category"
@@ -703,12 +710,14 @@ export const ReportPage: React.FC = () => {
                 >
                   {COMPLAINT_CATEGORIES.map((cat) => (
                     <option key={cat.value} value={cat.value}>
-                      {cat.label}
+                      {translateCategory(cat.value, t, cat.label)}
                     </option>
                   ))}
                 </select>
                 <p className="text-[11px] text-slate-400">
-                  {COMPLAINT_CATEGORIES.find((c) => c.value === category)?.description}
+                  {COMPLAINT_CATEGORIES.find((c) => c.value === category)
+                    ? translateCategoryDescription(category, t, COMPLAINT_CATEGORIES.find((c) => c.value === category)!.description)
+                    : ''}
                 </p>
               </div>
 
@@ -719,12 +728,12 @@ export const ReportPage: React.FC = () => {
                     htmlFor="report-description" 
                     className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
                   >
-                    Description <span className="text-rose-500">*</span>
+                    {t('report.description')} <span className="text-rose-500">*</span>
                   </label>
                   <span className={`text-[11px] ${
                     description.trim().length >= 10 ? 'text-emerald-600 font-bold' : 'text-slate-400'
                   }`}>
-                    {description.trim().length}/10 min chars
+                    {t('report.charactersRequired', { count: description.trim().length })}
                   </span>
                 </div>
                 <textarea
@@ -733,7 +742,7 @@ export const ReportPage: React.FC = () => {
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe the issue, landmarks, hazard level, or relevant details for municipal workers..."
+                  placeholder={t('report.descriptionPlaceholder')}
                   className="w-full p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition resize-none leading-relaxed"
                 />
               </div>
@@ -744,11 +753,11 @@ export const ReportPage: React.FC = () => {
                   <div className="flex items-center justify-between text-xs">
                     <span className="flex items-center gap-1.5 font-bold text-blue-900">
                       <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                      AI Grievance Assistant
+                      {t('report.aiAssistant')}
                     </span>
                     {isAiAnalyzing ? (
                       <span className="text-[11px] text-blue-600 flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Analyzing...
+                        <Loader2 className="w-3 h-3 animate-spin" /> {t('report.analyzing')}
                       </span>
                     ) : aiAssessment ? (
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
@@ -758,7 +767,7 @@ export const ReportPage: React.FC = () => {
                           ? 'bg-amber-100 text-amber-800'
                           : 'bg-emerald-100 text-emerald-800'
                       }`}>
-                        Priority: {aiAssessment.severity}
+                        {t('report.priority', { priority: t(`ai.severity.${aiAssessment.severity}` as 'ai.severity.low' | 'ai.severity.medium' | 'ai.severity.high' | 'ai.severity.urgent') })}
                       </span>
                     ) : null}
                   </div>
@@ -768,20 +777,20 @@ export const ReportPage: React.FC = () => {
                       {aiAssessment.suggestedCategory !== category && (
                         <div className="flex items-center justify-between bg-white p-2 rounded-xl border border-blue-200">
                           <span className="text-[11px] text-slate-600">
-                            Suggested category: <strong>{COMPLAINT_CATEGORIES.find(c => c.value === aiAssessment.suggestedCategory)?.label}</strong>
+                            {t('report.suggestedCategory')} <strong>{translateCategory(aiAssessment.suggestedCategory, t, aiAssessment.suggestedCategory)}</strong>
                           </span>
                           <button
                             type="button"
                             onClick={handleApplyAiCategory}
                             className="px-2.5 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-bold active:scale-95 transition"
                           >
-                            Apply
+                            {t('report.apply')}
                           </button>
                         </div>
                       )}
                       {aiAssessment.safetyAdvisory && (
                         <p className="text-[11px] text-blue-800 italic">
-                          💡 {aiAssessment.safetyAdvisory}
+                          💡 {t(aiAssessment.severity === 'urgent' ? 'ai.safetyUrgent' : aiAssessment.suggestedCategory === 'streetlight' ? 'ai.safetyStreetlight' : 'ai.safetyDrainage')}
                         </p>
                       )}
                     </div>

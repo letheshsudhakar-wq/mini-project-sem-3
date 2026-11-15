@@ -14,6 +14,7 @@ import { UpvoteButton } from './UpvoteButton';
 import { ImageModal } from './ImageModal';
 import { COMPLAINT_CATEGORIES } from '../utils/constants';
 import type { Complaint } from '../types';
+import { translateCategory, useLanguage } from '../i18n';
 
 interface MapComplaintDrawerProps {
   complaint: Complaint | null;
@@ -27,11 +28,13 @@ export const MapComplaintDrawer: React.FC<MapComplaintDrawerProps> = ({
   onUpvoteChange,
 }) => {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const { t, formatDate } = useLanguage();
 
   if (!complaint) return null;
 
   const categoryInfo = COMPLAINT_CATEGORIES.find((c) => c.value === complaint.category);
-  const formattedDate = new Date(complaint.created_at).toLocaleDateString('en-US', {
+  const categoryLabel = translateCategory(complaint.category, t, categoryInfo?.label || complaint.category);
+  const formattedDate = formatDate(complaint.created_at, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -43,14 +46,14 @@ export const MapComplaintDrawer: React.FC<MapComplaintDrawerProps> = ({
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg">
-            {categoryInfo?.label || complaint.category}
+            {categoryLabel}
           </span>
           <StatusBadge status={complaint.status} size="sm" />
         </div>
         <button
           onClick={onClose}
           className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition cursor-pointer"
-          aria-label="Close issue preview"
+          aria-label={t('map.closePreview')}
         >
           <X className="w-5 h-5" />
         </button>
@@ -65,7 +68,7 @@ export const MapComplaintDrawer: React.FC<MapComplaintDrawerProps> = ({
           >
             <img
               src={complaint.photo_url}
-              alt="Issue evidence"
+              alt={t('map.closePreview')}
               className="w-full h-full object-cover group-hover:scale-105 transition"
             />
             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
@@ -91,7 +94,7 @@ export const MapComplaintDrawer: React.FC<MapComplaintDrawerProps> = ({
             </span>
             <span className="flex items-center gap-1 font-semibold text-slate-700">
               <ThumbsUp className="w-3.5 h-3.5 text-amber-500" />
-              {complaint.upvote_count} upvotes
+              {t('map.upvoteCount', { count: complaint.upvote_count })}
             </span>
           </div>
         </div>
@@ -113,7 +116,7 @@ export const MapComplaintDrawer: React.FC<MapComplaintDrawerProps> = ({
           className="w-full sm:w-auto py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 text-center"
         >
           <FileText className="w-4 h-4" />
-          <span>View Full Timeline</span>
+          <span>{t('map.viewTimeline')}</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>

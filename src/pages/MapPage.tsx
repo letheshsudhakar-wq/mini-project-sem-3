@@ -15,12 +15,14 @@ import { MapComplaintDrawer } from '../components/MapComplaintDrawer';
 import { COMPLAINT_CATEGORIES } from '../utils/constants';
 import { nativeService } from '../services/nativeService';
 import { useToast } from '../contexts/ToastContext';
+import { translateCategory, useLanguage } from '../i18n';
 import type { Complaint, ComplaintCategory } from '../types';
 
 type StatusFilterType = 'all' | 'reported' | 'in_progress';
 
 export const MapPage: React.FC = () => {
   const { info, warning } = useToast();
+  const { t } = useLanguage();
 
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -44,7 +46,7 @@ export const MapPage: React.FC = () => {
     try {
       const { data, error } = await complaintsService.getOpenComplaintsForMap();
       if (error) {
-        setErrorMsg('Unable to load civic complaints. Please check your connection.');
+        setErrorMsg(t('map.loadError'));
       } else {
         const validList = (data || []).filter(
           (c) =>
@@ -58,15 +60,15 @@ export const MapPage: React.FC = () => {
         setComplaints(validList);
         if (isManualRefresh) {
           nativeService.triggerHaptic('success');
-          info('Map complaints updated');
+          info(t('map.refreshSuccess'));
         }
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Error fetching open map complaints.');
+      setErrorMsg(err?.message || t('map.fetchError'));
     } finally {
       setIsLoading(false);
     }
-  }, [info]);
+  }, [info, t]);
 
   useEffect(() => {
     fetchOpenComplaints();
@@ -94,17 +96,17 @@ export const MapPage: React.FC = () => {
       nativeService.triggerHaptic(count > 0 ? 'success' : 'light');
 
       if (count > 0) {
-        const alertText = `Found ${count} open civic issue(s) within 500m of your location.`;
+        const alertText = t('map.foundNearby', { count });
         setLocationAlert(alertText);
         info(alertText);
       } else {
-        const alertText = 'No open civic issues found within 500m of your location.';
+        const alertText = t('map.noNearby');
         setLocationAlert(alertText);
         info(alertText);
       }
-    } catch (err: any) {
+    } catch {
       setIsLocating(false);
-      const msg = err?.message || 'Unable to acquire GPS location.';
+      const msg = t('map.locationUnavailable');
       setLocationAlert(msg);
       warning(msg);
     }
@@ -112,13 +114,9 @@ export const MapPage: React.FC = () => {
 
   // Compute category counts for active complaints
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = {
-      pothole: 0,
-      streetlight: 0,
-      drainage: 0,
-      garbage: 0,
-      other: 0,
-    };
+    const counts: Record<string, number> = Object.fromEntries(
+      COMPLAINT_CATEGORIES.map(({ value }) => [value, 0])
+    );
     complaints.forEach((c) => {
       if (counts[c.category] !== undefined) {
         counts[c.category]++;
@@ -152,13 +150,13 @@ export const MapPage: React.FC = () => {
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
             <MapPin className="w-3.5 h-3.5" />
-            Civic Geographic Visualization
+            {t('map.badge')}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-            Public Civic Issue Map
+            {t('map.title')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500">
-            Explore reported and in-progress civic grievances across your neighborhood in real-time.
+            {t('map.description')}
           </p>
         </div>
 
@@ -175,7 +173,7 @@ export const MapPage: React.FC = () => {
             ) : (
               <Navigation className="w-4 h-4 text-blue-600" />
             )}
-            <span>{isLocating ? 'Scanning Area...' : 'Find Near Me'}</span>
+            <span>{isLocating ? t('map.scanning') : t('map.findNearMe')}</span>
           </button>
 
           <Link
@@ -184,7 +182,7 @@ export const MapPage: React.FC = () => {
             className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-md shadow-blue-500/20 transition active:scale-95"
           >
             <PlusCircle className="w-4 h-4" />
-            Report Issue
+            {t('map.reportIssue')}
           </Link>
         </div>
       </div>
@@ -200,7 +198,7 @@ export const MapPage: React.FC = () => {
             onClick={() => setLocationAlert(null)}
             className="text-xs font-bold text-blue-700 hover:underline cursor-pointer shrink-0"
           >
-            Dismiss
+            {t('map.dismiss')}
           </button>
         </div>
       )}
@@ -221,7 +219,7 @@ export const MapPage: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
             }`}
           >
-            All ({complaints.length})
+            {t('map.all')} ({complaints.length})
           </button>
           {COMPLAINT_CATEGORIES.map((cat) => (
             <button
@@ -237,7 +235,7 @@ export const MapPage: React.FC = () => {
                   : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
               }`}
             >
-              <span>{cat.label.split(' ')[0]}</span>
+              <span>{translateCategory(cat.value, t, cat.label)}</span>
               <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
                 categoryFilter === cat.value ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
               }`}>
@@ -260,7 +258,7 @@ export const MapPage: React.FC = () => {
                 statusFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              All Open
+              {t('map.allOpen')}
             </button>
             <button
               type="button"
@@ -273,7 +271,7 @@ export const MapPage: React.FC = () => {
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              Reported
+              {t('map.reported')}
             </button>
             <button
               type="button"
@@ -286,14 +284,14 @@ export const MapPage: React.FC = () => {
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-              In Progress
+              {t('map.inProgress')}
             </button>
           </div>
 
           <button
             type="button"
             onClick={() => fetchOpenComplaints(true)}
-            title="Refresh map complaints"
+            title={t('map.refreshTitle')}
             className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-2xl border border-slate-200 transition shrink-0 active:scale-95 cursor-pointer"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
@@ -311,7 +309,7 @@ export const MapPage: React.FC = () => {
               onClick={() => fetchOpenComplaints(true)}
               className="text-xs font-bold text-rose-700 hover:underline"
             >
-              Retry
+              {t('map.retry')}
             </button>
           </div>
         )}
@@ -334,7 +332,7 @@ export const MapPage: React.FC = () => {
             <div className="absolute inset-0 bg-white/60 backdrop-blur-xs z-[500] flex items-center justify-center rounded-3xl">
               <div className="bg-white/95 px-5 py-3 rounded-2xl shadow-xl border border-slate-200 flex items-center gap-2.5 text-xs font-bold text-slate-800">
                 <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                <span>Loading open civic issues...</span>
+                <span>{t('map.loading')}</span>
               </div>
             </div>
           )}
@@ -369,13 +367,13 @@ export const MapPage: React.FC = () => {
             </div>
             <h3 className="text-sm sm:text-base font-bold text-slate-800">
               {complaints.length === 0
-                ? 'No open civic issues have been reported yet.'
-                : 'No open complaints match your current filter selection.'}
+                ? t('map.noIssues')
+                : t('map.noMatches')}
             </h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               {complaints.length === 0
-                ? 'Be the first to report a pothole, broken streetlight, drainage, or garbage issue in your area.'
-                : 'Try switching to "All Categories" or "All Open" to view all reported issues.'}
+                ? t('map.firstIssue')
+                : t('map.tryFilters')}
             </p>
             {complaints.length === 0 ? (
               <div className="pt-1">
@@ -385,7 +383,7 @@ export const MapPage: React.FC = () => {
                   className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-bold shadow-sm transition active:scale-95"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  Report an Issue
+                  {t('complaints.reportIssue')}
                 </Link>
               </div>
             ) : (
@@ -398,7 +396,7 @@ export const MapPage: React.FC = () => {
                 }}
                 className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
               >
-                Clear all filters
+                {t('map.clearFilters')}
               </button>
             )}
           </div>

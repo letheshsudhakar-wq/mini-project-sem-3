@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured, getSupabaseOAuthRedirectUrl } from '../lib/supabase';
+import {
+  supabase,
+  isSupabaseConfigured,
+  getSupabaseConfigurationError,
+  getSupabaseOAuthRedirectUrl,
+} from '../lib/supabase';
 import type { Profile, UserRole } from '../types';
 import { MockCivicStore, DEMO_PROFILES } from '../utils/mockData';
 import { setDemoGovernmentSession } from '../utils/demoGovernmentAccess';
@@ -61,8 +66,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
 
   // Helper to fetch the profile from public.profiles with retry support
-  const fetchProfile = useCallback(async (userId: string, retries = 2): Promise<Profile | null> => {
-    if (!isSupabaseConfigured) {
+  const fetchProfile = useCallback(async function fetchProfileInternal(userId: string, retries = 2): Promise<Profile | null> {
+    if (!supabase) {
       const profiles = MockCivicStore.getProfiles();
       const prof = profiles[userId] || null;
       if (prof) setProfile(prof);
@@ -89,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (retries > 0) {
         await new Promise((resolve) => setTimeout(resolve, 350));
-        return await fetchProfile(userId, retries - 1);
+        return await fetchProfileInternal(userId, retries - 1);
       }
 
       // Safe fallback if profile row not yet created in Supabase
@@ -121,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isMounted = true;
 
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       // Check offline/demo localStorage session
       try {
         const stored = localStorage.getItem(LOCAL_SESSION_KEY);
@@ -159,18 +164,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Auth State Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, currentSession) => {
+      (_event, currentSession) => {
         if (!isMounted) return;
 
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
 
+        if (_event === 'INITIAL_SESSION') return;
+
         if (currentSession?.user) {
-          await fetchProfile(currentSession.user.id);
+          setLoading(true);
+          window.setTimeout(() => {
+            if (!isMounted) return;
+            void fetchProfile(currentSession.user.id).finally(() => {
+              if (isMounted) setLoading(false);
+            });
+          }, 0);
         } else {
           setProfile(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
@@ -202,7 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const trimmedEmail = email.trim().toLowerCase();
 
     // If Supabase is not configured or in offline demo mode, provide instant offline login
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       setLoading(true);
       const profiles = MockCivicStore.getProfiles();
       let matchedProfile = Object.values(profiles).find((p) => p.email?.toLowerCase() === trimmedEmail);
@@ -258,9 +271,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     setLoading(true);
     try {
-      if (!isSupabaseConfigured) {
+      if (!supabase) {
         const configError = new Error(
-          'Google sign-in could not be completed. Authentication configuration is incomplete. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file and configure your Supabase Google provider.'
+          `Google sign-in is unavailable. ${getSupabaseConfigurationError()}`
         );
         setLoading(false);
         return { error: configError };
@@ -292,7 +305,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedName = name.trim();
 
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       setLoading(true);
       const newProfile: Profile = {
         id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -348,8 +361,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     setLoading(true);
     try {
-      if (isSupabaseConfigured) {
-        await supabase.auth.signOut().catch(() => null);
+      if (supabase) {
+        const { error } = await supabase.auth.signOut();
+        if (error) return { error };
       }
       localStorage.removeItem(LOCAL_SESSION_KEY);
       setDemoGovernmentSession(false);
@@ -357,8 +371,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(null);
       setProfile(null);
       return { error: null };
-    } catch (err: any) {
-      return { error: err };
+    } catch (err) {
+      return { error: err instanceof Error ? err : new Error(String(err)) };
     } finally {
       setLoading(false);
     }

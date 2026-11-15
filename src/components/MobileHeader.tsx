@@ -11,6 +11,7 @@ import { useAuth } from '../hooks/useAuth';
 import { nativeService } from '../services/nativeService';
 
 import { CivicLogoIcon } from './CivicLogo';
+import { useLanguage } from '../i18n';
 
 interface MobileHeaderProps {
   onOpenDrawer: () => void;
@@ -26,6 +27,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { user, profile, isAdmin, isDemoMode } = useAuth();
+  const { t } = useLanguage();
 
   const isChildRoute = 
     location.pathname.startsWith('/complaints/') ||
@@ -35,13 +37,13 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
 
   const getScreenTitle = () => {
     if (location.pathname === '/') return 'CivicFix';
-    if (location.pathname === '/complaints') return 'My Complaints';
-    if (location.pathname.startsWith('/complaints/')) return 'Grievance Details';
-    if (location.pathname === '/report') return 'Report Issue';
-    if (location.pathname === '/map') return 'Public Map';
-    if (location.pathname === '/admin') return 'Admin Dashboard';
-    if (location.pathname === '/login') return 'Sign In';
-    if (location.pathname === '/signup') return 'Create Account';
+    if (location.pathname === '/complaints') return t('screen.complaints');
+    if (location.pathname.startsWith('/complaints/')) return t('screen.complaintDetails');
+    if (location.pathname === '/report') return t('screen.report');
+    if (location.pathname === '/map') return t('screen.map');
+    if (location.pathname === '/admin' || location.pathname === '/government') return t('screen.government');
+    if (location.pathname === '/login' || location.pathname === '/government/login') return t('nav.signIn');
+    if (location.pathname === '/signup') return t('screen.createAccount');
     return 'CivicFix';
   };
 
@@ -83,7 +85,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               {getScreenTitle()}
             </h1>
             <span className="text-[10px] text-slate-400 font-medium tracking-tight -mt-0.5 truncate">
-              {isAdmin ? 'Municipal Operations' : 'Civic Grievance Platform'}
+              {isAdmin ? t('screen.municipalOperations') : t('screen.civicPlatform')}
             </span>
           </div>
         </div>
